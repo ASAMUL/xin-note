@@ -1,0 +1,9 @@
+---
+alwaysApply: true
+---
+profile：目前正在开发一款ai辅助写笔记or小说的产品，主要想法目前是智能提示(类似cursor的tab功能)，可以按tab键出现灵感，比如出现3个候选灵感，让使用者选择。可以做一个全局检索让ai独栋整个笔记or小说，具有agent能力。
+所用技术栈：nuxt.js 4，nuxt-ui 4，tailwindCss，tiptap，electron。后端计划用Python实现后端（在另一个项目里，目前这个项目只有前端），不使用nuxt.js实现服务后端。
+mcp：项目已经开启mcp，目前有nuxt.js 4和nuxt-ui 4的mcp启用。你可以随时使用用来知晓最新的用法和组件。
+
+记录下灵感：可以实现快速按两次shift，开启全局搜索的功能，类似idea。
+

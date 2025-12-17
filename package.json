@@ -2,8 +2,11 @@
   "name": "lumina-front",
   "type": "module",
   "private": true,
+  "version": "0.0.1",
+  "main": "dist-electron/main.js",
   "scripts": {
     "build": "nuxt build",
+    "electron:build": "nuxi build --prerender && electron-builder",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
@@ -27,5 +30,9 @@
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6"
   },
-  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
+  "pnpm": {
+    "overrides": {
+      "@parcel/watcher": "2.4.1"
+    }
+  }
 }

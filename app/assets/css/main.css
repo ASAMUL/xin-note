@@ -1,2 +1,25 @@
 @import "@nuxt/ui";
 @import "tailwindcss";
+:root {
+    /* 默认：暖调护眼 (羊皮纸/书房风格) */
+    --bg-app: #F0EEE5;       /* 应用底色：灰暖色 */
+    --bg-sidebar: #E8E5DC;   /* 侧边栏：稍深 */
+    --bg-paper: #FAF9F6;     /* 纸张：云峰白 */
+    --bg-popup: #FFFFFF;     /* 弹窗背景 */
+    --border-color: #D6D3C9; /* 边框 */
+    --text-main: #332F2C;    /* 文字：墨色 */
+    --text-mute: #857F78;    /* 弱化文字 */
+    --highlight-bg: #FEF3C7; /* 高亮背景 */
+}
+
+.dark {
+    /* 深色：静谧深夜 */
+    --bg-app: #0F0F10;
+    --bg-sidebar: #161618;
+    --bg-paper: #161618;     
+    --bg-popup: #1F1F22;     /* 深色弹窗 */
+    --border-color: #27272A;
+    --text-main: #E4E4E7;
+    --text-mute: #71717A;
+    --highlight-bg: #3F2C06;
+}
