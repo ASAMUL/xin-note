@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'node:path'
 
 // The built directory structure
@@ -22,7 +22,18 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
 let win: BrowserWindow | null
 
 function createWindow() {
+  // Use the display nearest to current cursor (better for multi-monitor setups).
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const { width: screenWidth, height: screenHeight } = display.workAreaSize
+  const width = Math.max(800, Math.round(screenWidth * 0.8))
+  const height = Math.max(600, Math.round(screenHeight * 0.8))
+
   win = new BrowserWindow({
+    width,
+    height,
+    frame: false, // 关键：去掉了原生标题栏和边框
+    transparent: true,
+    center: true,
     webPreferences: {
       preload: path.join(MAIN_DIST, 'preload.js'),
     },
