@@ -1,8 +1,8 @@
 
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "cn.lumina.front",
-  "productName": "扶光", 
+  "appId": "cn.illumine.note.cn",
+  "productName": "illumine", 
   "asar": true,
   "directories": {
     "output": "release/${version}"
@@ -37,7 +37,7 @@
     "deleteAppDataOnUninstall": false,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "扶光",
+    "shortcutName": "illumine",
     "guid": "xxxx-xxxx-xxxx-xxx1" 
   }
 }
