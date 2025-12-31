@@ -82,6 +82,9 @@ body {
     background-color: var(--bg-app);
     color: var(--text-main);
 }
+@theme {
+  --font-sans: "LXGW WenKai TC", "sans-serif";
+}
 
 /* ========================================
    Tiptap 编辑器样式
