@@ -1,0 +1,535 @@
+<script setup lang="ts">
+// 窗口控制
+const isMaximized = ref(false)
+
+// 初始化时获取最大化状态
+onMounted(async () => {
+  if (window.ipcRenderer) {
+    isMaximized.value = await window.ipcRenderer.invoke('window-is-maximized')
+  }
+})
+
+const minimizeWindow = () => {
+  window.ipcRenderer?.send('window-minimize')
+}
+
+const toggleMaximize = async () => {
+  window.ipcRenderer?.send('window-toggle-maximize')
+  // 延迟获取最新状态
+  await nextTick()
+  if (window.ipcRenderer) {
+    isMaximized.value = await window.ipcRenderer.invoke('window-is-maximized')
+  }
+}
+
+// 关闭确认弹窗
+const { closeAction, setCloseAction } = useWindowPreferences()
+const showCloseConfirm = ref(false)
+const rememberChoice = ref(false)
+
+// 处理关闭按钮点击
+const handleCloseClick = () => {
+  // 如果用户已设置偏好，直接执行
+  if (closeAction.value === 'minimize') {
+    minimizeWindow()
+    return
+  }
+  if (closeAction.value === 'close') {
+    window.ipcRenderer?.send('window-close')
+    return
+  }
+  // 否则显示确认弹窗
+  showCloseConfirm.value = true
+  rememberChoice.value = false
+}
+
+// 执行最小化
+const doMinimize = () => {
+  if (rememberChoice.value) {
+    setCloseAction('minimize')
+  }
+  showCloseConfirm.value = false
+  minimizeWindow()
+}
+
+// 执行关闭
+const doClose = () => {
+  if (rememberChoice.value) {
+    setCloseAction('close')
+  }
+  showCloseConfirm.value = false
+  window.ipcRenderer?.send('window-close')
+}
+
+// 导航菜单项
+const navItems = ref([
+  {
+    label: '文件',
+    icon: 'i-lucide-file',
+    children: [
+      { label: '新建笔记', icon: 'i-lucide-file-plus' },
+      { label: '打开...', icon: 'i-lucide-folder-open' },
+      { type: 'separator' },
+      { label: '保存', icon: 'i-lucide-save', shortcut: 'Ctrl+S' },
+      { label: '另存为...', icon: 'i-lucide-save-all' }
+    ]
+  },
+  {
+    label: '编辑',
+    icon: 'i-lucide-pencil',
+    children: [
+      { label: '撤销', icon: 'i-lucide-undo', shortcut: 'Ctrl+Z' },
+      { label: '重做', icon: 'i-lucide-redo', shortcut: 'Ctrl+Y' },
+      { type: 'separator' },
+      { label: '剪切', icon: 'i-lucide-scissors', shortcut: 'Ctrl+X' },
+      { label: '复制', icon: 'i-lucide-copy', shortcut: 'Ctrl+C' },
+      { label: '粘贴', icon: 'i-lucide-clipboard', shortcut: 'Ctrl+V' }
+    ]
+  },
+  {
+    label: '视图',
+    icon: 'i-lucide-layout-grid',
+    children: [
+      { label: '全屏', icon: 'i-lucide-maximize', shortcut: 'F11' },
+      { label: '禅模式', icon: 'i-lucide-focus' },
+      { type: 'separator' },
+      { label: '侧边栏', icon: 'i-lucide-panel-left' },
+      { label: 'AI 助手', icon: 'i-lucide-sparkles', shortcut: 'Ctrl+L' }
+    ]
+  },
+  {
+    label: '帮助',
+    icon: 'i-lucide-help-circle',
+    children: [
+      { label: '快捷键', icon: 'i-lucide-keyboard' },
+      { label: '文档', icon: 'i-lucide-book-open' },
+      { type: 'separator' },
+      { label: '关于 Lumina', icon: 'i-lucide-info' }
+    ]
+  }
+])
+
+// 搜索
+const searchOpen = ref(false)
+
+const openSearch = () => {
+  searchOpen.value = true
+}
+
+// 快捷键
+defineShortcuts({
+  'ctrl+p': openSearch,
+  'meta+p': openSearch
+})
+</script>
+
+<template>
+  <header class="app-navbar">
+    <!-- 窗口拖动区域 -->
+    <div class="drag-region" />
+
+    <!-- 左侧：Logo + 导航 -->
+    <div class="navbar-left">
+      <!-- Logo -->
+      <div class="logo-section">
+        <div class="logo">
+          <UIcon name="i-lucide-feather" class="w-5 h-5" />
+        </div>
+        <span class="logo-text">Lumina</span>
+      </div>
+
+      <!-- 导航菜单 -->
+      <nav class="nav-menu">
+        <UNavigationMenu 
+          :items="navItems" 
+          variant="link"
+          :ui="{
+            link: 'px-2.5 py-1.5 text-xs font-medium',
+            linkLeadingIcon: 'hidden'
+          }"
+        />
+      </nav>
+    </div>
+
+    <!-- 中间：搜索栏 -->
+    <div class="navbar-center">
+      <button class="search-trigger" @click="openSearch">
+        <UIcon name="i-lucide-search" class="w-4 h-4" />
+        <span>搜索笔记...</span>
+        <kbd>Ctrl+P</kbd>
+      </button>
+    </div>
+
+    <!-- 右侧：工具栏 + 窗口控制 -->
+    <div class="navbar-right">
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <UTooltip text="同步">
+          <UButton 
+            variant="ghost" 
+            color="neutral" 
+            size="xs" 
+            icon="i-lucide-cloud"
+          />
+        </UTooltip>
+        <UTooltip text="设置">
+          <UButton 
+            variant="ghost" 
+            color="neutral" 
+            size="xs" 
+            icon="i-lucide-settings"
+          />
+        </UTooltip>
+      </div>
+
+      <!-- 窗口控制按钮 -->
+      <div class="window-controls">
+        <button class="control-btn" @click="minimizeWindow" title="最小化">
+          <UIcon name="i-lucide-minus" class="w-4 h-4" />
+        </button>
+        <button class="control-btn" @click="toggleMaximize" :title="isMaximized ? '还原' : '最大化'">
+          <UIcon :name="isMaximized ? 'i-lucide-copy' : 'i-lucide-square'" class="w-3.5 h-3.5" />
+        </button>
+        <button class="control-btn control-btn--close" @click="handleCloseClick" title="关闭">
+          <UIcon name="i-lucide-x" class="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+
+    <!-- 搜索命令面板 -->
+    <UModal v-model:open="searchOpen" :ui="{ content: 'max-w-xl' }">
+      <template #content>
+        <UCommandPalette 
+          placeholder="搜索笔记、命令..."
+          :groups="[
+            {
+              id: 'recent',
+              label: '最近文档',
+              items: [
+                { id: '1', label: 'Novel Plot.md', icon: 'i-lucide-file-text' },
+                { id: '2', label: 'Characters.md', icon: 'i-lucide-file-text' },
+                { id: '3', label: '2024-12-26.md', icon: 'i-lucide-file-text' }
+              ]
+            },
+            {
+              id: 'commands',
+              label: '命令',
+              items: [
+                { id: 'new', label: '新建笔记', icon: 'i-lucide-file-plus' },
+                { id: 'ai', label: '打开 AI 助手', icon: 'i-lucide-sparkles', suffix: 'Ctrl+L' }
+              ]
+            }
+          ]"
+          @update:model-value="searchOpen = false"
+        />
+      </template>
+    </UModal>
+
+    <!-- 关闭确认弹窗 -->
+    <UModal v-model:open="showCloseConfirm">
+      <template #content>
+        <div class="close-confirm-dialog">
+          <!-- 头部 -->
+          <div class="dialog-header">
+            <div class="dialog-icon">
+              <UIcon name="i-lucide-log-out" class="w-6 h-6" />
+            </div>
+            <h3 class="dialog-title">关闭应用</h3>
+            <p class="dialog-description">请选择你想要的操作</p>
+          </div>
+
+          <!-- 选项按钮 -->
+          <div class="dialog-options">
+            <button class="option-btn option-minimize" @click="doMinimize">
+              <UIcon name="i-lucide-minus-circle" class="w-5 h-5" />
+              <span class="option-title">最小化到托盘</span>
+              <span class="option-desc">应用将在后台运行</span>
+            </button>
+            <button class="option-btn option-close" @click="doClose">
+              <UIcon name="i-lucide-power" class="w-5 h-5" />
+              <span class="option-title">退出应用</span>
+              <span class="option-desc">完全关闭程序</span>
+            </button>
+          </div>
+
+          <!-- 记住选择 -->
+          <div class="dialog-footer">
+            <UCheckbox v-model="rememberChoice" label="记住我的选择，下次不再询问" />
+          </div>
+        </div>
+      </template>
+    </UModal>
+  </header>
+</template>
+
+<style scoped>
+.app-navbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  background-color: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+  user-select: none;
+}
+
+/* 窗口拖动区域 - 覆盖整个导航栏 */
+.drag-region {
+  position: absolute;
+  inset: 0;
+  -webkit-app-region: drag;
+  pointer-events: none;
+}
+
+/* 让交互元素可点击 */
+.navbar-left,
+.navbar-center,
+.navbar-right,
+.nav-menu,
+.search-trigger,
+.toolbar,
+.window-controls {
+  position: relative;
+  z-index: 1;
+  -webkit-app-region: no-drag;
+}
+
+/* 左侧区域 */
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.75rem;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.75rem;
+  border-right: 1px solid var(--border-color);
+}
+
+.logo {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+  border-radius: 6px;
+  color: white;
+}
+
+.logo-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+  letter-spacing: -0.025em;
+}
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+}
+
+/* 中间搜索区域 */
+.navbar-center {
+  flex: 1;
+  max-width: 400px;
+  padding: 0 1.5rem;
+}
+
+.search-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-trigger:hover {
+  border-color: var(--accent-color);
+  background-color: var(--bg-paper);
+}
+
+.search-trigger kbd {
+  margin-left: auto;
+  padding: 0.125rem 0.375rem;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-family: inherit;
+}
+
+/* 右侧区域 */
+.navbar-right {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.75rem;
+  border-right: 1px solid var(--border-color);
+  margin-right: 0.5rem;
+}
+
+/* 窗口控制按钮 */
+.window-controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.control-btn:hover {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+}
+
+.control-btn--close:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+/* 深色模式调整 */
+.dark .search-trigger {
+  background-color: var(--bg-paper);
+}
+
+.dark .search-trigger:hover {
+  background-color: var(--bg-popup);
+}
+
+/* 关闭确认弹窗样式 */
+.close-confirm-dialog {
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.dialog-header {
+  margin-bottom: 1.5rem;
+}
+
+.dialog-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+  border-radius: 12px;
+  color: white;
+}
+
+.dialog-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 0.25rem;
+}
+
+.dialog-description {
+  font-size: 0.875rem;
+  color: var(--text-mute);
+  margin: 0;
+}
+
+.dialog-options {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.option-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.option-btn:hover {
+  border-color: var(--accent-color);
+  background-color: var(--bg-paper);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.option-minimize:hover {
+  border-color: #3b82f6;
+}
+
+.option-minimize:hover .option-title {
+  color: #3b82f6;
+}
+
+.option-close:hover {
+  border-color: #ef4444;
+}
+
+.option-close:hover .option-title {
+  color: #ef4444;
+}
+
+.option-btn .option-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.option-btn .option-desc {
+  font-size: 0.75rem;
+  color: var(--text-mute);
+}
+
+.dialog-footer {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+}
+
+/* 深色模式调整 */
+.dark .option-btn {
+  background-color: var(--bg-paper);
+}
+
+.dark .option-btn:hover {
+  background-color: var(--bg-popup);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+</style>

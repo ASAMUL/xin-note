@@ -2,11 +2,19 @@
 import path from 'path';
 
 export default defineNuxtConfig({
-  compatibilityDate: "2025-07-15",
+  compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
-  css: ["~/assets/css/main.css"],
-  modules: ["@pinia/nuxt", "@nuxt/ui","nuxt-electron"],
-  ssr: false, 
+  css: ['~/assets/css/main.css'],
+  modules: ['@pinia/nuxt', '@nuxt/ui', 'nuxt-electron', '@nuxt/fonts'],
+  fonts: {
+    families: [
+      { name: 'Inter', provider: 'google' },
+      { name: 'Noto Serif SC', provider: 'google' },
+      { name: 'JetBrains Mono', provider: 'google' },
+      { name: 'LXGW WenKai TC', provider: 'google' },
+    ],
+  },
+  ssr: false,
   electron: {
     build: [
       {
@@ -34,7 +42,7 @@ export default defineNuxtConfig({
             //   external: ['node:sqlite'],
             // },
           },
-        
+
           resolve: {
             alias: { '~/': path.join(__dirname, 'app/') },
           },
@@ -43,9 +51,9 @@ export default defineNuxtConfig({
       {
         entry: 'app/electron/preload.ts',
         onstart(args) {
-          // Notify the Renderer-Process to reload the page when the Preload-Scripts build is complete, 
+          // Notify the Renderer-Process to reload the page when the Preload-Scripts build is complete,
           // instead of restarting the entire Electron App.
-          args.reload()
+          args.reload();
         },
       },
     ],
