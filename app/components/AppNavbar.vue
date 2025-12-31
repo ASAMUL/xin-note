@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// 设置
+const { notesDirectory, selectNotesDirectory } = useSettings()
+const showSettings = ref(false)
+
 // 窗口控制
 const isMaximized = ref(false)
 
@@ -178,6 +182,7 @@ defineShortcuts({
             color="neutral" 
             size="xs" 
             icon="i-lucide-settings"
+            @click="showSettings = true"
           />
         </UTooltip>
       </div>
@@ -255,6 +260,50 @@ defineShortcuts({
           <!-- 记住选择 -->
           <div class="dialog-footer">
             <UCheckbox v-model="rememberChoice" label="记住我的选择，下次不再询问" />
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- 设置弹窗 -->
+    <UModal v-model:open="showSettings" :ui="{ content: 'max-w-md' }">
+      <template #content>
+        <div class="settings-dialog">
+          <!-- 头部 -->
+          <div class="settings-header">
+            <div class="settings-icon">
+              <UIcon name="i-lucide-settings" class="w-5 h-5" />
+            </div>
+            <h3 class="settings-title">设置</h3>
+          </div>
+
+          <!-- 设置项 -->
+          <div class="settings-content">
+            <!-- 笔记存储目录 -->
+            <div class="settings-item">
+              <div class="settings-item-header">
+                <UIcon name="i-lucide-folder" class="w-4 h-4" />
+                <span class="settings-item-label">笔记存储目录</span>
+              </div>
+              <div class="settings-item-value">
+                <span v-if="notesDirectory" class="directory-path">{{ notesDirectory }}</span>
+                <span v-else class="directory-empty">未设置</span>
+                <UButton 
+                  variant="soft" 
+                  color="primary" 
+                  size="xs"
+                  icon="i-lucide-folder-open"
+                  @click="selectNotesDirectory()"
+                >
+                  {{ notesDirectory ? '更改' : '选择' }}
+                </UButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部 -->
+          <div class="settings-footer">
+            <UButton variant="ghost" color="neutral" @click="showSettings = false">关闭</UButton>
           </div>
         </div>
       </template>
@@ -531,5 +580,98 @@ defineShortcuts({
 .dark .option-btn:hover {
   background-color: var(--bg-popup);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* 设置弹窗样式 */
+.settings-dialog {
+  padding: 1.5rem;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
+  border-radius: 10px;
+  color: white;
+}
+
+.settings-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.settings-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-main);
+}
+
+.settings-item-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.settings-item-value {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.directory-path {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--text-mute);
+  word-break: break-all;
+  padding: 0.5rem;
+  background-color: var(--bg-sidebar);
+  border-radius: 6px;
+}
+
+.directory-empty {
+  flex: 1;
+  font-size: 0.75rem;
+  color: var(--text-mute);
+  font-style: italic;
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.dark .settings-item {
+  background-color: var(--bg-paper);
 }
 </style>
