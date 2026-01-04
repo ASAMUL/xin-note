@@ -33,7 +33,7 @@ function createWindow() {
   win = new BrowserWindow({
     width,
     height,
-    frame: false, // 关键：去掉了原生标题栏和边框
+    frame: false,
     transparent: true,
     center: true,
     webPreferences: {

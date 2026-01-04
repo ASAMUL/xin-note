@@ -2,7 +2,7 @@
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 
-const { activeNote, updateNoteContent, saveNote, isModified } = useNotes()
+const { activeTab, updateTabContent, saveTab } = useTabs()
 const { autoSaveDelay } = useSettings()
 
 // 自动保存定时器
@@ -19,13 +19,15 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: {
-      class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[calc(100vh-4rem)] p-8'
+      class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[calc(100vh-6rem)] p-8'
     }
   },
   onUpdate: ({ editor }) => {
-    // 更新笔记内容
+    if (!activeTab.value) return
+    
+    // 更新标签页内容
     const content = editor.getHTML()
-    updateNoteContent(content)
+    updateTabContent(activeTab.value.id, content)
     saveStatus.value = 'unsaved'
     
     // 触发自动保存
@@ -48,18 +50,18 @@ const triggerAutoSave = () => {
 
 // 执行保存
 const performSave = async () => {
-  if (!activeNote.value || !isModified.value) return
+  if (!activeTab.value || !activeTab.value.isModified) return
   
   saveStatus.value = 'saving'
-  const success = await saveNote()
+  const success = await saveTab()
   saveStatus.value = success ? 'saved' : 'unsaved'
 }
 
-// 监听活动笔记变化，加载内容
-watch(activeNote, (note) => {
-  if (note && editor.value) {
-    editor.value.commands.setContent(note.content || '')
-    saveStatus.value = note.isModified ? 'unsaved' : 'saved'
+// 监听活动标签页变化，加载内容
+watch(activeTab, (tab) => {
+  if (tab && editor.value) {
+    editor.value.commands.setContent(tab.content || '')
+    saveStatus.value = tab.isModified ? 'unsaved' : 'saved'
   } else if (editor.value) {
     editor.value.commands.setContent('')
     saveStatus.value = 'saved'
@@ -69,12 +71,12 @@ watch(activeNote, (note) => {
 // 快捷键保存
 defineShortcuts({
   'ctrl+s': () => {
-    if (activeNote.value) {
+    if (activeTab.value) {
       performSave()
     }
   },
   'meta+s': () => {
-    if (activeNote.value) {
+    if (activeTab.value) {
       performSave()
     }
   }
@@ -105,16 +107,15 @@ const saveStatusInfo = computed(() => {
 
 <template>
   <div class="editor-container">
-    <!-- 编辑器头部 -->
-    <div v-if="activeNote" class="editor-header">
-      <div class="editor-title">
-        <UIcon name="i-lucide-file-text" class="w-4 h-4" />
-        <span>{{ activeNote.name.replace('.md', '') }}</span>
-      </div>
+    <!-- 标签页栏 -->
+    <EditorTabs />
+
+    <!-- 编辑器状态栏 -->
+    <div v-if="activeTab" class="editor-status-bar">
       <div class="editor-status">
         <UIcon 
           :name="saveStatusInfo.icon" 
-          class="w-4 h-4" 
+          class="w-3.5 h-3.5" 
           :class="[saveStatusInfo.color, { 'animate-spin': saveStatus === 'saving' }]"
         />
         <span class="status-text" :class="saveStatusInfo.color">{{ saveStatusInfo.text }}</span>
@@ -124,7 +125,7 @@ const saveStatusInfo = computed(() => {
     <!-- 编辑器内容区 -->
     <div class="editor-content">
       <!-- 未选择笔记提示 -->
-      <div v-if="!activeNote" class="empty-editor">
+      <div v-if="!activeTab" class="empty-editor">
         <UIcon name="i-lucide-file-text" class="w-16 h-16 empty-icon" />
         <h3 class="empty-title">选择一篇笔记开始编辑</h3>
         <p class="empty-desc">从左侧笔记列表选择，或创建一篇新笔记</p>
@@ -146,22 +147,13 @@ const saveStatusInfo = computed(() => {
   background-color: var(--bg-paper);
 }
 
-.editor-header {
+.editor-status-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid var(--border-color);
+  justify-content: flex-end;
+  padding: 0.25rem 1rem;
   background-color: var(--bg-sidebar);
-}
-
-.editor-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-main);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .editor-status {

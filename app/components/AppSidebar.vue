@@ -3,15 +3,14 @@ import type { NoteItem } from '~/composables/useNotes'
 
 const { 
   notes, 
-  activeNote, 
   isLoading,
   createNote, 
-  openNote, 
   renameNote, 
   deleteNote,
   showInExplorer,
   copyPath 
 } = useNotes()
+const { openTab, activeTabId } = useTabs()
 const { notesDirectory, selectNotesDirectory } = useSettings()
 
 // 转换笔记数据为 UTree 格式
@@ -38,7 +37,7 @@ const contextMenuItems = computed(() => [
     {
       label: '在编辑器中打开',
       icon: 'i-lucide-file-edit',
-      onSelect: () => contextMenuTarget.value && openNote(contextMenuTarget.value)
+      onSelect: () => contextMenuTarget.value && openTab(contextMenuTarget.value)
     }
   ],
   [
@@ -116,7 +115,7 @@ const doDelete = async () => {
 // 处理树形项点击
 const handleItemSelect = (item: any) => {
   if (item.value && !item.value.isFolder) {
-    openNote(item.value)
+    openTab(item.value)
   }
 }
 
@@ -218,8 +217,8 @@ const handleSelectDirectory = async () => {
         <template v-for="note in notes" :key="note.id">
           <div 
             class="note-item"
-            :class="{ 'note-item--active': activeNote?.id === note.id }"
-            @click="!note.isFolder && openNote(note)"
+            :class="{ 'note-item--active': activeTabId === note.id }"
+            @click="!note.isFolder && openTab(note)"
             @contextmenu="(e) => handleContextMenu(e, note)"
           >
             <UIcon 
@@ -227,11 +226,6 @@ const handleSelectDirectory = async () => {
               class="w-4 h-4 note-icon"
             />
             <span class="note-name">{{ note.name.replace('.md', '') }}</span>
-            <UIcon 
-              v-if="activeNote?.id === note.id && activeNote?.isModified" 
-              name="i-lucide-circle" 
-              class="w-2 h-2 modified-indicator"
-            />
           </div>
           
           <!-- 子项 -->
@@ -240,8 +234,8 @@ const handleSelectDirectory = async () => {
               v-for="child in note.children" 
               :key="child.id"
               class="note-item note-item--child"
-              :class="{ 'note-item--active': activeNote?.id === child.id }"
-              @click="!child.isFolder && openNote(child)"
+              :class="{ 'note-item--active': activeTabId === child.id }"
+              @click="!child.isFolder && openTab(child)"
               @contextmenu="(e) => handleContextMenu(e, child)"
             >
               <UIcon 
