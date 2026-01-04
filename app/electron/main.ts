@@ -224,6 +224,47 @@ function initIpc() {
   ipcMain.handle('clipboard-write', async (_event, text: string) => {
     clipboard.writeText(text);
   });
+
+  // ========== 配置文件操作 IPC ==========
+
+  // 获取用户数据目录
+  ipcMain.handle('get-user-data-path', () => {
+    return app.getPath('userData');
+  });
+
+  // 读取配置文件
+  ipcMain.handle('config-read', async (_event, fileName: string) => {
+    try {
+      const configPath = path.join(app.getPath('userData'), fileName);
+      console.log('读取配置文件:', configPath);
+      if (!existsSync(configPath)) return null;
+      const content = await fs.readFile(configPath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('读取配置文件失败:', error);
+      return null;
+    }
+  });
+
+  // 写入配置文件
+  ipcMain.handle(
+    'config-write',
+    async (_event, { fileName, data }: { fileName: string; data: any }) => {
+      try {
+        const configDir = app.getPath('userData');
+        // 确保目录存在
+        if (!existsSync(configDir)) {
+          await fs.mkdir(configDir, { recursive: true });
+        }
+        const configPath = path.join(configDir, fileName);
+        await fs.writeFile(configPath, JSON.stringify(data, null, 2), 'utf-8');
+        return true;
+      } catch (error) {
+        console.error('写入配置文件失败:', error);
+        return false;
+      }
+    },
+  );
 }
 
 app.on('window-all-closed', () => {

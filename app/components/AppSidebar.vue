@@ -10,7 +10,7 @@ const {
   showInExplorer,
   copyPath 
 } = useNotes()
-const { openTab, activeTabId } = useTabs()
+const { openTab, activeTab } = useTabs()
 const { notesDirectory, selectNotesDirectory } = useSettings()
 
 // 转换笔记数据为 UTree 格式
@@ -217,7 +217,7 @@ const handleSelectDirectory = async () => {
         <template v-for="note in notes" :key="note.id">
           <div 
             class="note-item"
-            :class="{ 'note-item--active': activeTabId === note.id }"
+            :class="{ 'note-item--active': activeTab?.path === note.path }"
             @click="!note.isFolder && openTab(note)"
             @contextmenu="(e) => handleContextMenu(e, note)"
           >
@@ -234,7 +234,7 @@ const handleSelectDirectory = async () => {
               v-for="child in note.children" 
               :key="child.id"
               class="note-item note-item--child"
-              :class="{ 'note-item--active': activeTabId === child.id }"
+              :class="{ 'note-item--active': activeTab?.path === child.path }"
               @click="!child.isFolder && openTab(child)"
               @contextmenu="(e) => handleContextMenu(e, child)"
             >

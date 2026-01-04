@@ -1,6 +1,7 @@
 /**
  * 标签页管理 composable
  * 负责多标签页的打开、关闭、切换等操作
+ * 支持工作区状态持久化到 JSON 文件
  */
 
 import type { NoteItem } from './useNotes';
@@ -20,6 +21,14 @@ interface TabsState {
   activeTabId: string | null;
 }
 
+// 工作区数据结构（只存路径，不存内容）
+interface WorkspaceData {
+  openTabPaths: string[]; // 打开的文件路径列表
+  activeTabPath: string | null; // 当前激活的标签页路径
+}
+
+const WORKSPACE_FILE = 'workspace.json';
+
 export function useTabs() {
   // 标签页状态（使用 useState 保证跨组件共享）
   const state = useState<TabsState>('tabs-state', () => ({
@@ -27,11 +36,122 @@ export function useTabs() {
     activeTabId: null,
   }));
 
+  // 初始化状态也使用 useState 确保全局唯一
+  const isWorkspaceRestored = useState<boolean>('workspace-restored', () => false);
+  const isRestoring = useState<boolean>('workspace-restoring', () => false);
+
   // 获取当前激活的标签页
   const activeTab = computed(() => {
     if (!state.value.activeTabId) return null;
     return state.value.openTabs.find((tab) => tab.id === state.value.activeTabId) || null;
   });
+
+  /**
+   * 保存工作区状态到 JSON 文件
+   */
+  const saveWorkspace = async () => {
+    if (!window.ipcRenderer) return;
+
+    try {
+      const data: WorkspaceData = {
+        openTabPaths: state.value.openTabs.map((tab) => tab.path),
+        activeTabPath: activeTab.value?.path || null,
+      };
+      await window.ipcRenderer.invoke('config-write', {
+        fileName: WORKSPACE_FILE,
+        data,
+      });
+    } catch (error) {
+      console.error('保存工作区状态失败:', error);
+    }
+  };
+
+  /**
+   * 根据文件路径打开标签页
+   */
+  const openTabByPath = async (filePath: string): Promise<TabItem | null> => {
+    if (!window.ipcRenderer) return null;
+
+    // 检查是否已存在
+    const existing = state.value.openTabs.find((tab) => tab.path === filePath);
+    if (existing) {
+      state.value.activeTabId = existing.id;
+      return existing;
+    }
+
+    try {
+      // 读取文件内容
+      const content = (await window.ipcRenderer.invoke('file-read', filePath)) || '';
+
+      // 从路径提取文件名
+      const pathParts = filePath.replace(/\\/g, '/').split('/');
+      const fileName = pathParts[pathParts.length - 1] || 'unknown';
+
+      // 生成唯一 ID
+      const id = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
+
+      const newTab: TabItem = {
+        id,
+        name: fileName,
+        path: filePath,
+        isModified: false,
+        content,
+      };
+
+      state.value.openTabs.push(newTab);
+      state.value.activeTabId = newTab.id;
+
+      return newTab;
+    } catch (error) {
+      console.error('通过路径打开标签页失败:', error);
+      return null;
+    }
+  };
+
+  /**
+   * 恢复工作区状态（应用启动时调用）
+   */
+  const restoreWorkspace = async () => {
+    // 避免重复恢复
+    if (isWorkspaceRestored.value || isRestoring.value) return;
+    if (!window.ipcRenderer) return;
+
+    isRestoring.value = true;
+    try {
+      const data: WorkspaceData | null = await window.ipcRenderer.invoke(
+        'config-read',
+        WORKSPACE_FILE,
+      );
+      if (!data || !data.openTabPaths || data.openTabPaths.length === 0) {
+        isWorkspaceRestored.value = true;
+        return;
+      }
+
+      // 清空现有标签页（避免重复）
+      state.value.openTabs = [];
+      state.value.activeTabId = null;
+
+      // 根据路径重新打开标签页
+      for (const filePath of data.openTabPaths) {
+        await openTabByPath(filePath);
+      }
+
+      // 恢复激活状态
+      if (data.activeTabPath) {
+        const tab = state.value.openTabs.find((t) => t.path === data.activeTabPath);
+        if (tab) {
+          state.value.activeTabId = tab.id;
+        }
+      }
+
+      isWorkspaceRestored.value = true;
+    } catch (error) {
+      console.error('恢复工作区状态失败:', error);
+      isWorkspaceRestored.value = true;
+    } finally {
+      isRestoring.value = false;
+    }
+  };
 
   /**
    * 打开标签页
@@ -41,8 +161,8 @@ export function useTabs() {
   const openTab = async (note: NoteItem) => {
     if (note.isFolder) return;
 
-    // 检查标签页是否已存在
-    const existingTab = state.value.openTabs.find((tab) => tab.id === note.id);
+    // 检查标签页是否已存在（通过路径匹配，因为恢复的标签页 id 不同）
+    const existingTab = state.value.openTabs.find((tab) => tab.path === note.path);
 
     if (existingTab) {
       // 切换到已存在的标签页
@@ -72,12 +192,15 @@ export function useTabs() {
     // 添加到标签页列表并激活
     state.value.openTabs.push(newTab);
     state.value.activeTabId = newTab.id;
+
+    // 保存工作区状态
+    await saveWorkspace();
   };
 
   /**
    * 关闭指定标签页
    */
-  const closeTab = (tabId: string) => {
+  const closeTab = async (tabId: string) => {
     const index = state.value.openTabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
 
@@ -95,23 +218,29 @@ export function useTabs() {
 
     // 移除标签页
     state.value.openTabs.splice(index, 1);
+
+    // 保存工作区状态
+    await saveWorkspace();
   };
 
   /**
    * 关闭其他所有标签页
    */
-  const closeOtherTabs = (tabId: string) => {
+  const closeOtherTabs = async (tabId: string) => {
     const tab = state.value.openTabs.find((t) => t.id === tabId);
     if (!tab) return;
 
     state.value.openTabs = [tab];
     state.value.activeTabId = tabId;
+
+    // 保存工作区状态
+    await saveWorkspace();
   };
 
   /**
    * 关闭右侧所有标签页
    */
-  const closeTabsToRight = (tabId: string) => {
+  const closeTabsToRight = async (tabId: string) => {
     const index = state.value.openTabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
 
@@ -122,12 +251,15 @@ export function useTabs() {
     if (!state.value.openTabs.find((tab) => tab.id === state.value.activeTabId)) {
       state.value.activeTabId = state.value.openTabs[state.value.openTabs.length - 1]?.id || null;
     }
+
+    // 保存工作区状态
+    await saveWorkspace();
   };
 
   /**
    * 关闭左侧所有标签页
    */
-  const closeTabsToLeft = (tabId: string) => {
+  const closeTabsToLeft = async (tabId: string) => {
     const index = state.value.openTabs.findIndex((tab) => tab.id === tabId);
     if (index === -1) return;
 
@@ -138,23 +270,32 @@ export function useTabs() {
     if (!state.value.openTabs.find((tab) => tab.id === state.value.activeTabId)) {
       state.value.activeTabId = state.value.openTabs[0]?.id || null;
     }
+
+    // 保存工作区状态
+    await saveWorkspace();
   };
 
   /**
    * 关闭所有标签页
    */
-  const closeAllTabs = () => {
+  const closeAllTabs = async () => {
     state.value.openTabs = [];
     state.value.activeTabId = null;
+
+    // 保存工作区状态
+    await saveWorkspace();
   };
 
   /**
    * 切换到指定标签页
    */
-  const switchTab = (tabId: string) => {
+  const switchTab = async (tabId: string) => {
     const tab = state.value.openTabs.find((t) => t.id === tabId);
     if (tab) {
       state.value.activeTabId = tabId;
+
+      // 保存工作区状态
+      await saveWorkspace();
     }
   };
 
@@ -210,15 +351,22 @@ export function useTabs() {
     await window.ipcRenderer.invoke('clipboard-write', tab.path);
   };
 
+  // 客户端初始化时恢复工作区
+  if (import.meta.client && !isWorkspaceRestored.value && !isRestoring.value) {
+    restoreWorkspace();
+  }
+
   return {
     // 状态
     openTabs: computed(() => state.value.openTabs),
     activeTabId: computed(() => state.value.activeTabId),
     activeTab,
     hasOpenTabs: computed(() => state.value.openTabs.length > 0),
+    isWorkspaceRestored: computed(() => isWorkspaceRestored.value),
 
     // 方法
     openTab,
+    openTabByPath,
     closeTab,
     closeOtherTabs,
     closeTabsToRight,
@@ -229,5 +377,7 @@ export function useTabs() {
     saveTab,
     showTabInExplorer,
     copyTabPath,
+    restoreWorkspace,
+    saveWorkspace,
   };
 }
