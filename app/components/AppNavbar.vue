@@ -463,7 +463,7 @@ defineShortcuts({
 }
 
 .control-btn--close:hover {
-  background-color: #dc2626;
+  background-color: var(--color-error);
   color: white;
 }
 
@@ -535,23 +535,23 @@ defineShortcuts({
   border-color: var(--accent-color);
   background-color: var(--bg-paper);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 .option-minimize:hover {
-  border-color: #3b82f6;
+  border-color: var(--color-info);
 }
 
 .option-minimize:hover .option-title {
-  color: #3b82f6;
+  color: var(--color-info);
 }
 
 .option-close:hover {
-  border-color: #ef4444;
+  border-color: var(--color-error);
 }
 
 .option-close:hover .option-title {
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .option-btn .option-title {
@@ -579,7 +579,7 @@ defineShortcuts({
 
 .dark .option-btn:hover {
   background-color: var(--bg-popup);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--shadow-color);
 }
 
 /* 设置弹窗样式 */

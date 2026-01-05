@@ -484,12 +484,12 @@ const handleSelectDirectory = async () => {
 }
 
 .delete-icon {
-  background-color: #FEE2E2;
-  color: #DC2626;
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
 }
 
 .dark .delete-icon {
-  background-color: #450A0A;
-  color: #F87171;
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
 }
 </style>

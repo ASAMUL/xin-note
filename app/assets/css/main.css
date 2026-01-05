@@ -23,6 +23,36 @@
     --highlight-bg: #FEF3C7; /* 高亮背景 */
     --accent-color: #B8860B; /* 金棕强调色 */
     --accent-hover: #9A7209;
+
+    /* ====== 语义化颜色（按用途分类） ====== */
+    
+    /* 错误/危险色 - 用于删除、错误提示、关闭按钮等 */
+    --color-error: #DC2626;
+    --color-error-hover: #B91C1C;
+    --color-error-bg: #FEE2E2;
+    --color-error-bg-subtle: #FEF2F2;
+    
+    /* 成功色 - 用于保存成功、完成状态等 */
+    --color-success: #16A34A;
+    --color-success-hover: #15803D;
+    --color-success-bg: #DCFCE7;
+    --color-success-bg-subtle: #F0FDF4;
+    
+    /* 警告色 - 用于未保存、注意提示等 */
+    --color-warning: #F59E0B;
+    --color-warning-hover: #D97706;
+    --color-warning-bg: #FEF3C7;
+    --color-warning-bg-subtle: #FFFBEB;
+    
+    /* 信息色 - 用于提示、链接、选中状态等 */
+    --color-info: #3B82F6;
+    --color-info-hover: #2563EB;
+    --color-info-bg: #DBEAFE;
+    --color-info-bg-subtle: #EFF6FF;
+    
+    /* 阴影色 - 用于 box-shadow */
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --shadow-color-strong: rgba(0, 0, 0, 0.15);
 }
 
 .dark {
@@ -40,6 +70,36 @@
     --highlight-bg: #3F2C06;
     --accent-color: #D4A017;
     --accent-hover: #E8B423;
+
+    /* ====== 语义化颜色（深色模式） ====== */
+    
+    /* 错误/危险色 */
+    --color-error: #F87171;
+    --color-error-hover: #FCA5A5;
+    --color-error-bg: #450A0A;
+    --color-error-bg-subtle: #2D0A0A;
+    
+    /* 成功色 */
+    --color-success: #4ADE80;
+    --color-success-hover: #86EFAC;
+    --color-success-bg: #052E16;
+    --color-success-bg-subtle: #022C22;
+    
+    /* 警告色 */
+    --color-warning: #FACC15;
+    --color-warning-hover: #FDE047;
+    --color-warning-bg: #422006;
+    --color-warning-bg-subtle: #2D1A06;
+    
+    /* 信息色 */
+    --color-info: #60A5FA;
+    --color-info-hover: #93C5FD;
+    --color-info-bg: #1E3A5F;
+    --color-info-bg-subtle: #172554;
+    
+    /* 阴影色 - 深色模式需要更强的阴影 */
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --shadow-color-strong: rgba(0, 0, 0, 0.5);
 }
 
 /* ========================================

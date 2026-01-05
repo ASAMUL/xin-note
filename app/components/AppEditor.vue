@@ -227,16 +227,4 @@ const saveStatusInfo = computed(() => {
   margin: 0;
 }
 
-/* 深色模式保存状态颜色调整 */
-.dark .text-green-500 {
-  color: #4ADE80;
-}
-
-.dark .text-yellow-500 {
-  color: #FACC15;
-}
-
-.dark .text-orange-500 {
-  color: #FB923C;
-}
 </style>
