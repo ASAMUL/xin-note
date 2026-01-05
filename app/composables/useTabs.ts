@@ -80,6 +80,13 @@ export function useTabs() {
     }
 
     try {
+      // 检查文件是否存在并读取内容
+      const exists = await window.ipcRenderer.invoke('file-exists', filePath);
+      if (!exists) {
+        console.warn('文件不存在，跳过打开:', filePath);
+        return null;
+      }
+
       // 读取文件内容
       const content = (await window.ipcRenderer.invoke('file-read', filePath)) || '';
 
@@ -105,6 +112,17 @@ export function useTabs() {
     } catch (error) {
       console.error('通过路径打开标签页失败:', error);
       return null;
+    }
+  };
+
+  /**
+   * 根据文件路径关闭标签页
+   * 用于文件被删除时同步关闭对应的标签页
+   */
+  const closeTabByPath = async (filePath: string) => {
+    const tab = state.value.openTabs.find((t) => t.path === filePath);
+    if (tab) {
+      await closeTab(tab.id);
     }
   };
 
@@ -377,6 +395,7 @@ export function useTabs() {
     saveTab,
     showTabInExplorer,
     copyTabPath,
+    closeTabByPath,
     restoreWorkspace,
     saveWorkspace,
   };

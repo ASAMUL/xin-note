@@ -41,6 +41,37 @@ function createWindow() {
     },
   });
 
+  // 在主进程捕获快捷键，然后通过 IPC 发送给渲染进程
+  // 这是在 Electron 中处理自定义快捷键的正确方式
+  win.webContents.on('before-input-event', (event, input) => {
+    // 只处理按键按下事件
+    if (input.type !== 'keyDown') return;
+
+    // 检测修饰键（Ctrl 或 Cmd）
+    const isModKey = input.control || input.meta;
+
+    // Ctrl/Cmd + P - 打开搜索面板
+    if (isModKey && input.key.toLowerCase() === 'p') {
+      event.preventDefault();
+      win?.webContents.send('shortcut-triggered', 'open-search');
+      return;
+    }
+
+    // Ctrl/Cmd + N - 新建笔记
+    if (isModKey && input.key.toLowerCase() === 'n') {
+      event.preventDefault();
+      win?.webContents.send('shortcut-triggered', 'create-note');
+      return;
+    }
+
+    // Ctrl/Cmd + . - 打开设置
+    if (isModKey && input.key === '.') {
+      event.preventDefault();
+      win?.webContents.send('shortcut-triggered', 'open-settings');
+      return;
+    }
+  });
+
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
     win.webContents.openDevTools();
@@ -182,6 +213,16 @@ function initIpc() {
       }
     },
   );
+
+  // 检查文件是否存在
+  ipcMain.handle('file-exists', async (_event, filePath: string) => {
+    try {
+      return existsSync(filePath);
+    } catch (error) {
+      console.error('检查文件是否存在失败:', error);
+      return false;
+    }
+  });
 
   // 删除文件
   ipcMain.handle('file-delete', async (_event, filePath: string) => {

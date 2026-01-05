@@ -3,6 +3,19 @@
 const { notesDirectory, selectNotesDirectory } = useSettings()
 const showSettings = ref(false)
 
+// 命令面板状态
+const searchOpen = ref(false)
+
+// 笔记操作
+const { createNote } = useNotes()
+
+// 全局快捷键注册
+useShortcuts({
+  onOpenSettings: () => { showSettings.value = true },
+  onOpenSearch: () => { searchOpen.value = true },
+  onCreateNote: () => { createNote() },
+})
+
 // 窗口控制
 const isMaximized = ref(false)
 
@@ -113,18 +126,6 @@ const navItems = ref([
   }
 ])
 
-// 搜索
-const searchOpen = ref(false)
-
-const openSearch = () => {
-  searchOpen.value = true
-}
-
-// 快捷键
-defineShortcuts({
-  'ctrl+p': openSearch,
-  'meta+p': openSearch
-})
 </script>
 
 <template>
@@ -157,7 +158,7 @@ defineShortcuts({
 
     <!-- 中间：搜索栏 -->
     <div class="navbar-center">
-      <button class="search-trigger" @click="openSearch">
+      <button class="search-trigger" @click="searchOpen = true">
         <UIcon name="i-lucide-search" class="w-4 h-4" />
         <span>搜索笔记...</span>
         <kbd>Ctrl+P</kbd>
@@ -202,33 +203,10 @@ defineShortcuts({
     </div>
 
     <!-- 搜索命令面板 -->
-    <UModal v-model:open="searchOpen" :ui="{ content: 'max-w-xl' }">
-      <template #content>
-        <UCommandPalette 
-          placeholder="搜索笔记、命令..."
-          :groups="[
-            {
-              id: 'recent',
-              label: '最近文档',
-              items: [
-                { id: '1', label: 'Novel Plot.md', icon: 'i-lucide-file-text' },
-                { id: '2', label: 'Characters.md', icon: 'i-lucide-file-text' },
-                { id: '3', label: '2024-12-26.md', icon: 'i-lucide-file-text' }
-              ]
-            },
-            {
-              id: 'commands',
-              label: '命令',
-              items: [
-                { id: 'new', label: '新建笔记', icon: 'i-lucide-file-plus' },
-                { id: 'ai', label: '打开 AI 助手', icon: 'i-lucide-sparkles', suffix: 'Ctrl+L' }
-              ]
-            }
-          ]"
-          @update:model-value="searchOpen = false"
-        />
-      </template>
-    </UModal>
+    <CommandPalette 
+      v-model:open="searchOpen" 
+      @open-settings="showSettings = true"
+    />
 
     <!-- 关闭确认弹窗 -->
     <UModal v-model:open="showCloseConfirm">

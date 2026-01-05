@@ -176,6 +176,10 @@ export function useNotes() {
           state.value.activeNote = null;
         }
 
+        // 同步关闭对应的标签页
+        const { closeTabByPath } = useTabs();
+        await closeTabByPath(note.path);
+
         // 刷新笔记列表
         await loadNotes();
         return true;
