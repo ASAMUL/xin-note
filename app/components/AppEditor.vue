@@ -11,6 +11,12 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 // 保存状态
 const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
 
+// 上次保存时间
+const lastSavedTime = ref<Date | null>(null)
+
+// 是否正在通过 setContent 设置内容（用于防止误判为用户修改）
+let isSettingContent = false
+
 // 编辑器实例
 const editor = useEditor({
   content: '',
@@ -24,6 +30,9 @@ const editor = useEditor({
   },
   onUpdate: ({ editor }) => {
     if (!activeTab.value) return
+    
+    // 如果是程序设置内容，不视为用户修改
+    if (isSettingContent) return
     
     // 更新标签页内容
     const content = editor.getHTML()
@@ -55,16 +64,34 @@ const performSave = async () => {
   saveStatus.value = 'saving'
   const success = await saveTab()
   saveStatus.value = success ? 'saved' : 'unsaved'
+  
+  // 更新上次保存时间
+  if (success) {
+    lastSavedTime.value = new Date()
+  }
 }
 
 // 监听活动标签页变化，加载内容
 watch(activeTab, (tab) => {
   if (tab && editor.value) {
+    // 设置标志位，防止 setContent 触发的 onUpdate 被误判为用户修改
+    isSettingContent = true
     editor.value.commands.setContent(tab.content || '')
     saveStatus.value = tab.isModified ? 'unsaved' : 'saved'
+    // 重置上次保存时间（切换标签页时）
+    lastSavedTime.value = tab.isModified ? null : new Date()
+    // 使用 nextTick 确保在编辑器更新完成后重置标志位
+    nextTick(() => {
+      isSettingContent = false
+    })
   } else if (editor.value) {
+    isSettingContent = true
     editor.value.commands.setContent('')
     saveStatus.value = 'saved'
+    lastSavedTime.value = null
+    nextTick(() => {
+      isSettingContent = false
+    })
   }
 }, { immediate: true })
 
@@ -90,11 +117,35 @@ onBeforeUnmount(() => {
   editor.value?.destroy()
 })
 
+// 格式化上次保存时间
+const formatLastSavedTime = (date: Date): string => {
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  
+  if (seconds < 60) {
+    return '刚刚保存'
+  } else if (minutes < 60) {
+    return `${minutes} 分钟前保存`
+  } else if (hours < 24) {
+    return `${hours} 小时前保存`
+  } else {
+    // 显示具体日期时间
+    return `上次编辑 ${date.toLocaleDateString('zh-CN')} ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+  }
+}
+
 // 保存状态图标和文字
 const saveStatusInfo = computed(() => {
   switch (saveStatus.value) {
-    case 'saved':
-      return { icon: 'i-lucide-check-circle', text: '已保存', color: 'text-green-500' }
+    case 'saved': {
+      const timeText = lastSavedTime.value 
+        ? formatLastSavedTime(lastSavedTime.value) 
+        : '已保存'
+      return { icon: '', text: timeText, color: 'text-(--text-mute)' }
+    }
     case 'saving':
       return { icon: 'i-lucide-loader-2', text: '保存中...', color: 'text-yellow-500' }
     case 'unsaved':
@@ -107,20 +158,8 @@ const saveStatusInfo = computed(() => {
 
 <template>
   <div class="editor-container">
-    <!-- 标签页栏 -->
-    <EditorTabs />
-
-    <!-- 编辑器状态栏 -->
-    <div v-if="activeTab" class="editor-status-bar">
-      <div class="editor-status">
-        <UIcon 
-          :name="saveStatusInfo.icon" 
-          class="w-3.5 h-3.5" 
-          :class="[saveStatusInfo.color, { 'animate-spin': saveStatus === 'saving' }]"
-        />
-        <span class="status-text" :class="saveStatusInfo.color">{{ saveStatusInfo.text }}</span>
-      </div>
-    </div>
+    <!-- 标签页栏（包含保存状态） -->
+    <EditorTabs :save-status-info="saveStatusInfo" :save-status="saveStatus" />
 
     <!-- 编辑器内容区 -->
     <div class="editor-content">
@@ -147,24 +186,7 @@ const saveStatusInfo = computed(() => {
   background-color: var(--bg-paper);
 }
 
-.editor-status-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0.25rem 1rem;
-  background-color: var(--bg-sidebar);
-  border-bottom: 1px solid var(--border-color);
-}
 
-.editor-status {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-}
-
-.status-text {
-  font-size: 0.75rem;
-}
 
 .editor-content {
   flex: 1;

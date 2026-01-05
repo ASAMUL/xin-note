@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import type { TabItem } from '~/composables/useTabs'
 
+// 接收保存状态信息
+interface SaveStatusInfo {
+  icon: string
+  text: string
+  color: string
+}
+
+const props = defineProps<{
+  saveStatusInfo?: SaveStatusInfo
+  saveStatus?: 'saved' | 'saving' | 'unsaved'
+}>()
+
 const {
   openTabs,
   activeTabId,
@@ -74,48 +86,62 @@ const getDisplayName = (name: string) => {
 
 <template>
   <div class="tabs-container">
-    <!-- 空状态 -->
-    <div v-if="openTabs.length === 0" class="tabs-empty">
-      <span>暂无打开的文件</span>
+    <!-- 左侧标签页区域 -->
+    <div class="tabs-wrapper">
+      <!-- 空状态 -->
+      <div v-if="openTabs.length === 0" class="tabs-empty">
+        <span>暂无打开的文件</span>
+      </div>
+
+      <!-- 标签页列表 -->
+      <div v-else class="tabs-list">
+        <UContextMenu
+          v-for="tab in openTabs"
+          :key="tab.id"
+          :items="getContextMenuItems(tab)"
+        >
+          <div
+            class="tab-item"
+            :class="{ 'tab-item--active': tab.id === activeTabId }"
+            @click="switchTab(tab.id)"
+          >
+            <!-- 文件图标 -->
+            <UIcon name="i-lucide-file-text" class="tab-icon" />
+            
+            <!-- 文件名 -->
+            <span class="tab-name">{{ getDisplayName(tab.name) }}</span>
+            
+            <!-- 修改指示器 / 关闭按钮 -->
+            <div class="tab-actions ml-3">
+              <UIcon 
+                v-if="tab.isModified" 
+                name="i-lucide-circle" 
+                class="modified-indicator"
+              />
+              <UButton
+                variant="ghost"
+                color="neutral"
+                size="xs"
+                icon="i-lucide-x"
+                class="close-btn"
+                :class="{ 'close-btn--visible': !tab.isModified }"
+                @click.stop="closeTab(tab.id)"
+              />
+            </div>
+          </div>
+        </UContextMenu>
+      </div>
     </div>
 
-    <!-- 标签页列表 -->
-    <div v-else class="tabs-list">
-      <UContextMenu
-        v-for="tab in openTabs"
-        :key="tab.id"
-        :items="getContextMenuItems(tab)"
-      >
-        <div
-          class="tab-item"
-          :class="{ 'tab-item--active': tab.id === activeTabId }"
-          @click="switchTab(tab.id)"
-        >
-          <!-- 文件图标 -->
-          <UIcon name="i-lucide-file-text" class="tab-icon" />
-          
-          <!-- 文件名 -->
-          <span class="tab-name">{{ getDisplayName(tab.name) }}</span>
-          
-          <!-- 修改指示器 / 关闭按钮 -->
-          <div class="tab-actions ml-3">
-            <UIcon 
-              v-if="tab.isModified" 
-              name="i-lucide-circle" 
-              class="modified-indicator"
-            />
-            <UButton
-              variant="ghost"
-              color="neutral"
-              size="xs"
-              icon="i-lucide-x"
-              class="close-btn"
-              :class="{ 'close-btn--visible': !tab.isModified }"
-              @click.stop="closeTab(tab.id)"
-            />
-          </div>
-        </div>
-      </UContextMenu>
+    <!-- 右侧保存状态（仅当有打开的标签页时显示） -->
+    <div v-if="openTabs.length > 0 && saveStatusInfo" class="save-status">
+      <UIcon 
+        v-if="saveStatusInfo.icon"
+        :name="saveStatusInfo.icon" 
+        class="w-3.5 h-3.5" 
+        :class="[saveStatusInfo.color, { 'animate-spin': saveStatus === 'saving' }]"
+      />
+      <span class="save-status-text" :class="saveStatusInfo.color">{{ saveStatusInfo.text }}</span>
     </div>
   </div>
 </template>
@@ -124,18 +150,26 @@ const getDisplayName = (name: string) => {
 .tabs-container {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   height: 36px;
   background-color: var(--bg-sidebar);
   border-bottom: 1px solid var(--border-color);
+}
+
+.tabs-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.tabs-container::-webkit-scrollbar {
+.tabs-wrapper::-webkit-scrollbar {
   height: 3px;
 }
 
-.tabs-container::-webkit-scrollbar-thumb {
+.tabs-wrapper::-webkit-scrollbar-thumb {
   background-color: var(--border-color);
   border-radius: 3px;
 }
@@ -246,5 +280,21 @@ const getDisplayName = (name: string) => {
 
 .tab-item:hover .modified-indicator {
   display: none;
+}
+
+/* 右侧保存状态 */
+.save-status {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 1rem;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-color);
+  height: 100%;
+}
+
+.save-status-text {
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 </style>
