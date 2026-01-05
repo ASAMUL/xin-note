@@ -6,11 +6,16 @@
  *  SyntaxError: Cannot use import statement outside a module
  * and program may fail to start etc.
  * use 'require' instead.
- * 
+ *
  * NOTE that 'import' does not work, 'import type' DOES work.
  * probably typescript eliminates 'import type' on transpile.
  */
-const { contextBridge, ipcRenderer } = require('electron');
+import type { IpcRenderer, IpcRendererEvent } from 'electron';
+
+const { contextBridge, ipcRenderer } = require('electron') as {
+  contextBridge: Electron.ContextBridge;
+  ipcRenderer: IpcRenderer;
+};
 
 // --------- Expose some API to the Renderer process ---------
 //
@@ -26,22 +31,24 @@ const { contextBridge, ipcRenderer } = require('electron');
 //
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+    const [channel, listener] = args;
+    return ipcRenderer.on(channel, (event: IpcRendererEvent, ...args: unknown[]) =>
+      listener(event, ...args),
+    );
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
+    const [channel, ...omit] = args;
+    return ipcRenderer.off(channel, ...omit);
   },
   send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
+    const [channel, ...omit] = args;
+    return ipcRenderer.send(channel, ...omit);
   },
   invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
+    const [channel, ...omit] = args;
+    return ipcRenderer.invoke(channel, ...omit);
   },
 
   // You can expose other APTs you need here.
   // ...
-})
+});
