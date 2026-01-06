@@ -224,13 +224,20 @@ function initIpc() {
     }
   });
 
-  // 删除文件
+  // 删除文件或文件夹（递归删除）
   ipcMain.handle('file-delete', async (_event, filePath: string) => {
     try {
-      await fs.unlink(filePath);
+      const stat = statSync(filePath);
+      if (stat.isDirectory()) {
+        // 递归删除文件夹及其所有内容
+        await fs.rm(filePath, { recursive: true, force: true });
+      } else {
+        // 删除单个文件
+        await fs.unlink(filePath);
+      }
       return true;
     } catch (error) {
-      console.error('删除文件失败:', error);
+      console.error('删除文件/文件夹失败:', error);
       return false;
     }
   });
@@ -265,6 +272,55 @@ function initIpc() {
   ipcMain.handle('clipboard-write', async (_event, text: string) => {
     clipboard.writeText(text);
   });
+
+  // 移动文件或文件夹
+  ipcMain.handle(
+    'file-move',
+    async (_event, { sourcePath, targetDir }: { sourcePath: string; targetDir: string }) => {
+      try {
+        const fileName = path.basename(sourcePath);
+        let newPath = path.join(targetDir, fileName);
+
+        // 如果目标路径已存在，添加数字后缀
+        let counter = 1;
+        while (existsSync(newPath)) {
+          const ext = path.extname(fileName);
+          const baseName = path.basename(fileName, ext);
+          newPath = path.join(targetDir, `${baseName} (${counter})${ext}`);
+          counter++;
+        }
+
+        await fs.rename(sourcePath, newPath);
+        return newPath;
+      } catch (error) {
+        console.error('移动文件失败:', error);
+        return null;
+      }
+    },
+  );
+
+  // 创建文件夹
+  ipcMain.handle(
+    'dir-create',
+    async (_event, { directory, folderName }: { directory: string; folderName: string }) => {
+      try {
+        let folderPath = path.join(directory, folderName);
+
+        // 如果文件夹已存在，添加数字后缀
+        let counter = 1;
+        while (existsSync(folderPath)) {
+          folderPath = path.join(directory, `${folderName} (${counter})`);
+          counter++;
+        }
+
+        await fs.mkdir(folderPath, { recursive: true });
+        return folderPath;
+      } catch (error) {
+        console.error('创建文件夹失败:', error);
+        return null;
+      }
+    },
+  );
 
   // ========== 配置文件操作 IPC ==========
 

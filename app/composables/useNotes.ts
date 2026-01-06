@@ -11,6 +11,7 @@ export interface NoteItem {
   children?: NoteItem[];
   isModified?: boolean;
   content?: string;
+  expanded?: boolean; // 控制文件夹展开/折叠状态
 }
 
 export interface NoteState {
@@ -54,13 +55,17 @@ export function useNotes() {
   };
 
   // 创建新笔记
-  const createNote = async (name: string = '未命名笔记.md'): Promise<NoteItem | null> => {
-    if (!notesDirectory.value || !window.ipcRenderer) return null;
+  const createNote = async (
+    name: string = '未命名笔记.md',
+    parentDir?: string,
+  ): Promise<NoteItem | null> => {
+    const targetDir = parentDir || notesDirectory.value;
+    if (!targetDir || !window.ipcRenderer) return null;
 
     try {
       const fileName = name.endsWith('.md') ? name : `${name}.md`;
       const filePath = await window.ipcRenderer.invoke('file-create', {
-        directory: notesDirectory.value,
+        directory: targetDir,
         fileName,
         content: `# ${name.replace('.md', '')}\n\n`,
       });
@@ -163,7 +168,7 @@ export function useNotes() {
     return false;
   };
 
-  // 删除笔记
+  // 删除笔记或文件夹
   const deleteNote = async (note: NoteItem): Promise<boolean> => {
     if (!window.ipcRenderer) return false;
 
@@ -177,15 +182,29 @@ export function useNotes() {
         }
 
         // 同步关闭对应的标签页
-        const { closeTabByPath } = useTabs();
-        await closeTabByPath(note.path);
+        const { closeTabByPath, openTabs } = useTabs();
+
+        if (note.isFolder) {
+          // 如果删除的是文件夹，关闭该文件夹内所有打开的标签页
+          const folderPath = note.path;
+          const tabsToClose = openTabs.value.filter(
+            (tab: { path: string }) =>
+              tab.path.startsWith(folderPath + '\\') || tab.path.startsWith(folderPath + '/'),
+          );
+          for (const tab of tabsToClose) {
+            await closeTabByPath(tab.path);
+          }
+        } else {
+          // 删除单个文件，关闭对应标签页
+          await closeTabByPath(note.path);
+        }
 
         // 刷新笔记列表
         await loadNotes();
         return true;
       }
     } catch (error) {
-      console.error('删除笔记失败:', error);
+      console.error('删除笔记/文件夹失败:', error);
     }
     return false;
   };
@@ -200,6 +219,52 @@ export function useNotes() {
   const copyPath = async (note: NoteItem) => {
     if (!window.ipcRenderer) return;
     await window.ipcRenderer.invoke('clipboard-write', note.path);
+  };
+
+  // 移动笔记到目标文件夹
+  const moveNote = async (note: NoteItem, targetFolderPath: string): Promise<boolean> => {
+    if (!window.ipcRenderer) return false;
+
+    try {
+      const newPath = await window.ipcRenderer.invoke('file-move', {
+        sourcePath: note.path,
+        targetDir: targetFolderPath,
+      });
+
+      if (newPath) {
+        // 刷新笔记列表
+        await loadNotes();
+        return true;
+      }
+    } catch (error) {
+      console.error('移动笔记失败:', error);
+    }
+    return false;
+  };
+
+  // 创建新文件夹
+  const createFolder = async (
+    name: string = '新建文件夹',
+    parentDir?: string,
+  ): Promise<string | null> => {
+    const targetDir = parentDir || notesDirectory.value;
+    if (!targetDir || !window.ipcRenderer) return null;
+
+    try {
+      const folderPath = await window.ipcRenderer.invoke('dir-create', {
+        directory: targetDir,
+        folderName: name,
+      });
+
+      if (folderPath) {
+        // 刷新笔记列表
+        await loadNotes();
+        return folderPath;
+      }
+    } catch (error) {
+      console.error('创建文件夹失败:', error);
+    }
+    return null;
   };
 
   // 监听笔记目录变化
@@ -219,11 +284,13 @@ export function useNotes() {
     isModified: computed(() => state.value.activeNote?.isModified ?? false),
     loadNotes,
     createNote,
+    createFolder,
     openNote,
     saveNote,
     updateNoteContent,
     renameNote,
     deleteNote,
+    moveNote,
     showInExplorer,
     copyPath,
   };

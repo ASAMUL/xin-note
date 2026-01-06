@@ -4,27 +4,16 @@ import type { NoteItem } from '~/composables/useNotes'
 const { 
   notes, 
   isLoading,
-  createNote, 
+  createNote,
+  createFolder,
   renameNote, 
   deleteNote,
+  moveNote,
   showInExplorer,
   copyPath 
 } = useNotes()
 const { openTab, activeTab } = useTabs()
 const { notesDirectory, selectNotesDirectory } = useSettings()
-
-// 转换笔记数据为 UTree 格式
-const treeItems = computed(() => {
-  const convertToTreeItem = (note: NoteItem): any => ({
-    label: note.name.replace('.md', ''),
-    icon: note.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text',
-    value: note,
-    defaultExpanded: false,
-    children: note.children?.map(convertToTreeItem)
-  })
-  
-  return notes.value.map(convertToTreeItem)
-})
 
 // 右键菜单状态
 const contextMenuOpen = ref(false)
@@ -38,6 +27,18 @@ const contextMenuItems = computed(() => [
       label: '在编辑器中打开',
       icon: 'i-lucide-file-edit',
       onSelect: () => contextMenuTarget.value && openTab(contextMenuTarget.value)
+    }
+  ],
+  [
+    {
+      label: '新建笔记',
+      icon: 'i-lucide-file-plus',
+      onSelect: () => handleCreateNote()
+    },
+    {
+      label: '新建文件夹',
+      icon: 'i-lucide-folder-plus',
+      onSelect: () => showCreateFolderDialog()
     }
   ],
   [
@@ -112,13 +113,6 @@ const doDelete = async () => {
   deleteTarget.value = null
 }
 
-// 处理树形项点击
-const handleItemSelect = (item: any) => {
-  if (item.value && !item.value.isFolder) {
-    openTab(item.value)
-  }
-}
-
 // 处理右键菜单
 const handleContextMenu = (event: MouseEvent, note: NoteItem) => {
   event.preventDefault()
@@ -127,14 +121,81 @@ const handleContextMenu = (event: MouseEvent, note: NoteItem) => {
   contextMenuOpen.value = true
 }
 
-// 新建笔记
+// 新建笔记（考虑当前选中位置）
 const handleCreateNote = async () => {
   if (!notesDirectory.value) {
     // 如果没有设置目录，提示用户先设置
     await selectNotesDirectory()
   }
   if (notesDirectory.value) {
-    await createNote()
+    // 根据当前活动 tab 确定创建位置（tab 只能是文件，获取其所在目录）
+    let parentDir: string | undefined
+    if (activeTab.value) {
+      const path = activeTab.value.path
+      parentDir = path.substring(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')))
+    }
+    await createNote('未命名笔记.md', parentDir)
+  }
+}
+
+// 从头部按钮创建文件夹（考虑当前选中位置）
+const handleHeaderCreateFolder = () => {
+  // 根据当前活动 tab 确定创建位置（tab 只能是文件，获取其所在目录）
+  if (activeTab.value) {
+    const path = activeTab.value.path
+    const parentPath = path.substring(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')))
+    contextMenuTarget.value = { path: parentPath, isFolder: true } as NoteItem
+  } else {
+    contextMenuTarget.value = null
+  }
+  showCreateFolderDialog()
+}
+
+// 新建文件夹弹窗
+const showCreateFolder = ref(false)
+const newFolderName = ref('')
+
+const showCreateFolderDialog = () => {
+  newFolderName.value = ''
+  showCreateFolder.value = true
+}
+
+const confirmCreateFolder = async () => {
+  if (newFolderName.value.trim()) {
+    // 确定创建位置：如果右键点击的是文件夹则在其内部创建，如果是文件则在其所在目录创建
+    let parentDir: string | undefined
+    if (contextMenuTarget.value) {
+      if (contextMenuTarget.value.isFolder) {
+        // 在文件夹内部创建
+        parentDir = contextMenuTarget.value.path
+      } else {
+        // 在文件所在目录创建（获取父目录路径）
+        const path = contextMenuTarget.value.path
+        parentDir = path.substring(0, path.lastIndexOf('\\') > -1 ? path.lastIndexOf('\\') : path.lastIndexOf('/'))
+      }
+    }
+    await createFolder(newFolderName.value.trim(), parentDir)
+  }
+  showCreateFolder.value = false
+  newFolderName.value = ''
+}
+
+const cancelCreateFolder = () => {
+  showCreateFolder.value = false
+  newFolderName.value = ''
+}
+
+// 处理笔记选择
+const handleNoteSelect = (note: NoteItem) => {
+  if (!note.isFolder) {
+    openTab(note)
+  }
+}
+
+// 处理笔记移动（拖拽到文件夹）
+const handleNoteMove = async (note: NoteItem, targetFolderPath: string) => {
+  if (targetFolderPath) {
+    await moveNote(note, targetFolderPath)
   }
 }
 
@@ -162,12 +223,21 @@ const handleSelectDirectory = async () => {
             @click="useNotes().loadNotes()"
           />
         </UTooltip>
+        <UTooltip text="新建文件夹">
+          <UButton 
+            variant="ghost" 
+            color="neutral" 
+            size="xs" 
+            icon="i-lucide-folder-plus"
+            @click="handleHeaderCreateFolder"
+          />
+        </UTooltip>
         <UTooltip text="新建笔记">
           <UButton 
             variant="ghost" 
             color="neutral" 
             size="xs" 
-            icon="i-lucide-plus"
+            icon="i-lucide-file-plus"
             @click="handleCreateNote"
           />
         </UTooltip>
@@ -214,38 +284,14 @@ const handleSelectDirectory = async () => {
 
       <!-- 笔记树形列表 -->
       <div v-else class="notes-list">
-        <template v-for="note in notes" :key="note.id">
-          <div 
-            class="note-item"
-            :class="{ 'note-item--active': activeTab?.path === note.path }"
-            @click="!note.isFolder && openTab(note)"
-            @contextmenu="(e) => handleContextMenu(e, note)"
-          >
-            <UIcon 
-              :name="note.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text'" 
-              class="w-4 h-4 note-icon"
-            />
-            <span class="note-name">{{ note.name.replace('.md', '') }}</span>
-          </div>
-          
-          <!-- 子项 -->
-          <template v-if="note.isFolder && note.children?.length">
-            <div 
-              v-for="child in note.children" 
-              :key="child.id"
-              class="note-item note-item--child"
-              :class="{ 'note-item--active': activeTab?.path === child.path }"
-              @click="!child.isFolder && openTab(child)"
-              @contextmenu="(e) => handleContextMenu(e, child)"
-            >
-              <UIcon 
-                :name="child.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text'" 
-                class="w-4 h-4 note-icon"
-              />
-              <span class="note-name">{{ child.name.replace('.md', '') }}</span>
-            </div>
-          </template>
-        </template>
+        <NoteTree
+          :items="notes"
+          :active-tab-path="activeTab?.path"
+          :parent-folder-path="notesDirectory"
+          @select="handleNoteSelect"
+          @contextmenu="handleContextMenu"
+          @move="handleNoteMove"
+        />
       </div>
     </div>
 
@@ -301,6 +347,27 @@ const handleSelectDirectory = async () => {
           <div class="dialog-actions">
             <UButton variant="ghost" color="neutral" @click="showDeleteConfirm = false">取消</UButton>
             <UButton color="error" @click="doDelete">删除</UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- 新建文件夹弹窗 -->
+    <UModal v-model:open="showCreateFolder">
+      <template #content>
+        <div class="rename-dialog">
+          <h3 class="dialog-title">新建文件夹</h3>
+          <UInput 
+            v-model="newFolderName" 
+            placeholder="输入文件夹名称"
+            class="w-full"
+            autofocus
+            @keyup.enter="confirmCreateFolder"
+            @keyup.escape="cancelCreateFolder"
+          />
+          <div class="dialog-actions">
+            <UButton variant="ghost" color="neutral" @click="cancelCreateFolder">取消</UButton>
+            <UButton color="primary" @click="confirmCreateFolder">创建</UButton>
           </div>
         </div>
       </template>

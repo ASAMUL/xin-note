@@ -1,267 +1,314 @@
 <script setup lang="ts">
+/**
+ * NoteTree 组件 - 使用 vuedraggable 实现 VSCode 风格的拖拽树形结构
+ * 核心思路：每个文件夹展开时子项作为独立的 draggable 列表
+ * 未展开的文件夹使用原生拖放事件支持拖入
+ */
+import draggable from 'vuedraggable'
 import type { NoteItem } from '~/composables/useNotes'
 
-// Props 定义
+// Props
 interface Props {
-  notes: NoteItem[]
+  items: NoteItem[]
   activeTabPath?: string
+  depth?: number
+  parentFolderPath?: string
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  depth: 0,
+  activeTabPath: '',
+  parentFolderPath: ''
+})
 
-// Emits 定义
+// Emits
 const emit = defineEmits<{
   (e: 'select', note: NoteItem): void
   (e: 'contextmenu', event: MouseEvent, note: NoteItem): void
-  (e: 'move', source: NoteItem, target: NoteItem): void
+  (e: 'move', note: NoteItem, targetFolderPath: string): void
 }>()
 
-// 定义树形项类型
-interface NoteTreeItem {
-  label: string
-  icon: string
-  value: NoteItem
-  defaultExpanded: boolean
-  disabled: boolean
-  children?: NoteTreeItem[]
-}
+// 本地可编辑的列表（用于拖拽）
+const localItems = ref<NoteItem[]>([])
 
-/**
- * 将 NoteItem 转换为 UTree 所需的 TreeItem 格式
- */
-const convertToTreeItem = (note: NoteItem): NoteTreeItem => ({
-  label: note.name.replace('.md', ''),
-  icon: note.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text',
-  value: note,
-  defaultExpanded: note.isFolder, // 文件夹默认可展开
-  disabled: false,
-  children: note.children?.map(convertToTreeItem)
-})
-
-// 转换笔记数据为 UTree 格式
-const treeItems = computed<NoteTreeItem[]>(() => props.notes.map(convertToTreeItem))
+// 同步 props.items 到 localItems
+watch(() => props.items, (newItems) => {
+  localItems.value = [...newItems]
+}, { immediate: true, deep: true })
 
 // 展开状态管理
-const expandedPaths = ref<Set<string>>(new Set())
+const expandedFolders = useState<Set<string>>('note-tree-expanded', () => new Set())
 
-/**
- * 切换文件夹展开/收起状态
- */
-const toggleExpand = (item: NoteTreeItem) => {
-  const path = item.value.path
-  if (expandedPaths.value.has(path)) {
-    expandedPaths.value.delete(path)
+// 当前拖拽悬停的文件夹路径（用于高亮显示）
+const dragOverFolderPath = useState<string | null>('note-tree-dragover', () => null)
+
+// 当前正在拖拽的项目（全局共享）
+const currentDraggingItem = useState<NoteItem | null>('note-tree-dragging', () => null)
+
+// 切换文件夹展开状态
+const toggleExpand = (note: NoteItem, event?: MouseEvent) => {
+  if (!note.isFolder) return
+  event?.stopPropagation()
+  
+  if (expandedFolders.value.has(note.path)) {
+    expandedFolders.value.delete(note.path)
   } else {
-    expandedPaths.value.add(path)
+    expandedFolders.value.add(note.path)
   }
-  // 触发响应式更新
-  expandedPaths.value = new Set(expandedPaths.value)
 }
 
-/**
- * 检查文件夹是否展开
- */
-const isExpanded = (item: NoteTreeItem): boolean => {
-  return expandedPaths.value.has(item.value.path)
+// 判断文件夹是否展开
+const isExpanded = (note: NoteItem) => {
+  return note.isFolder && expandedFolders.value.has(note.path)
 }
 
-/**
- * 处理树形项点击事件
- */
-const handleItemClick = (item: NoteTreeItem) => {
-  const note = item.value
+// 处理项目点击
+const handleItemClick = (note: NoteItem) => {
   if (note.isFolder) {
-    // 文件夹：切换展开/收起
-    toggleExpand(item)
+    toggleExpand(note)
   } else {
-    // 文件：触发选择事件
     emit('select', note)
   }
 }
 
-/**
- * 右键菜单处理
- */
-const handleItemContextMenu = (event: MouseEvent, item: NoteTreeItem) => {
-  if (item.value) {
-    emit('contextmenu', event, item.value)
+// 处理右键菜单
+const handleContextMenu = (event: MouseEvent, note: NoteItem) => {
+  event.preventDefault()
+  event.stopPropagation()
+  emit('contextmenu', event, note)
+}
+
+// 拖拽配置 - 所有列表使用同一个 group 实现跨列表拖拽
+const dragOptions = computed(() => ({
+  animation: 200,
+  group: 'note-tree',
+  ghostClass: 'note-tree-ghost',
+  chosenClass: 'note-tree-chosen',
+  dragClass: 'note-tree-drag',
+  fallbackOnBody: true,
+  swapThreshold: 0.65,
+}))
+
+// 拖拽开始处理 - 记录当前拖拽的项目
+const onDragStart = (evt: any) => {
+  document.body.classList.add('is-dragging')
+  // 记录当前正在拖拽的项目
+  if (evt.item?.__draggable_context?.element) {
+    currentDraggingItem.value = evt.item.__draggable_context.element
   }
 }
 
-/**
- * 判断某个项是否为当前激活项
- */
-const isItemActive = (item: NoteTreeItem): boolean => {
-  return item.value?.path === props.activeTabPath
+// 拖拽结束处理
+const onDragEnd = () => {
+  document.body.classList.remove('is-dragging')
+  dragOverFolderPath.value = null
+  currentDraggingItem.value = null
 }
 
-// ========== 拖拽功能 ==========
-const draggedItem = ref<NoteTreeItem | null>(null)
-const dragOverItem = ref<NoteTreeItem | null>(null)
+// 处理列表变化（检测跨列表移动）
+const onListChange = (evt: any) => {
+  // 当有元素被添加到这个列表时
+  if (evt.added) {
+    const addedItem = evt.added.element as NoteItem
+    if (props.parentFolderPath && addedItem.path) {
+      const originalParent = getParentPath(addedItem.path)
+      // 只有当原始父目录与目标父目录不同时才触发移动
+      if (originalParent !== props.parentFolderPath) {
+        emit('move', addedItem, props.parentFolderPath)
+      }
+    }
+  }
+}
+
+// 获取文件的父目录路径
+const getParentPath = (filePath: string): string => {
+  const separatorIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'))
+  return separatorIndex > 0 ? filePath.substring(0, separatorIndex) : ''
+}
+
+// 计算缩进样式
+const getIndentStyle = (extraDepth: number = 0) => ({
+  paddingLeft: `${(props.depth + extraDepth) * 12}px`
+})
+
+// ========== 未展开文件夹的原生拖放处理 ==========
 
 /**
- * 开始拖拽
+ * 处理拖拽进入未展开的文件夹
+ * 设置高亮状态
  */
-const handleDragStart = (event: DragEvent, item: NoteTreeItem) => {
-  draggedItem.value = item
+const handleFolderDragEnter = (event: DragEvent, folder: NoteItem) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  // 不能拖到自己里面
+  if (currentDraggingItem.value?.path === folder.path) return
+  // 如果是文件夹，不能拖到自己的子文件夹里
+  if (currentDraggingItem.value?.isFolder && folder.path.startsWith(currentDraggingItem.value.path)) return
+  
+  dragOverFolderPath.value = folder.path
+}
+
+/**
+ * 处理拖拽悬停在未展开的文件夹上
+ * 必须阻止默认行为才能接收 drop 事件
+ */
+const handleFolderDragOver = (event: DragEvent, folder: NoteItem) => {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  // 不能拖到自己里面
+  if (currentDraggingItem.value?.path === folder.path) return
+  // 如果是文件夹，不能拖到自己的子文件夹里
+  if (currentDraggingItem.value?.isFolder && folder.path.startsWith(currentDraggingItem.value.path)) return
+  
+  // 设置允许移动操作
   if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', item.value.path)
+    event.dataTransfer.dropEffect = 'move'
   }
 }
 
 /**
- * 拖拽经过
+ * 处理拖拽离开未展开的文件夹
  */
-const handleDragOver = (event: DragEvent, item: NoteTreeItem) => {
+const handleFolderDragLeave = (event: DragEvent, folder: NoteItem) => {
   event.preventDefault()
-  // 只允许拖拽到文件夹上
-  if (item.value.isFolder && draggedItem.value && draggedItem.value.value.path !== item.value.path) {
-    dragOverItem.value = item
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move'
+  event.stopPropagation()
+  
+  // 检查是否真的离开了文件夹区域（而不是进入子元素）
+  const relatedTarget = event.relatedTarget as HTMLElement | null
+  const currentTarget = event.currentTarget as HTMLElement
+  
+  if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+    if (dragOverFolderPath.value === folder.path) {
+      dragOverFolderPath.value = null
     }
   }
 }
 
 /**
- * 拖拽离开
+ * 处理拖放到未展开的文件夹
  */
-const handleDragLeave = () => {
-  dragOverItem.value = null
-}
-
-/**
- * 拖拽结束
- */
-const handleDragEnd = () => {
-  draggedItem.value = null
-  dragOverItem.value = null
-}
-
-/**
- * 放置
- */
-const handleDrop = (event: DragEvent, targetItem: NoteTreeItem) => {
+const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
   event.preventDefault()
+  event.stopPropagation()
   
-  if (draggedItem.value && targetItem.value.isFolder && draggedItem.value.value.path !== targetItem.value.path) {
-    // 不能将文件夹拖拽到自己的子文件夹中
-    const sourcePath = draggedItem.value.value.path
-    const targetPath = targetItem.value.path
-    
-    if (!targetPath.startsWith(sourcePath)) {
-      emit('move', draggedItem.value.value, targetItem.value)
-    }
-  }
+  dragOverFolderPath.value = null
   
-  draggedItem.value = null
-  dragOverItem.value = null
-}
-
-/**
- * 检查是否为拖拽目标
- */
-const isDragOver = (item: NoteTreeItem): boolean => {
-  return dragOverItem.value?.value.path === item.value.path
+  // 获取正在拖拽的项目
+  const draggingItem = currentDraggingItem.value
+  if (!draggingItem) return
+  
+  // 不能拖到自己里面
+  if (draggingItem.path === folder.path) return
+  // 如果是文件夹，不能拖到自己的子文件夹里
+  if (draggingItem.isFolder && folder.path.startsWith(draggingItem.path)) return
+  
+  // 检查是否已经在目标文件夹内
+  const originalParent = getParentPath(draggingItem.path)
+  if (originalParent === folder.path) return
+  
+  // 触发移动事件
+  emit('move', draggingItem, folder.path)
 }
 </script>
 
 <template>
-  <div class="note-tree">
-    <!-- 递归渲染树形结构 -->
-    <template v-for="item in treeItems" :key="item.value.id">
-      <div
-        class="note-tree-item"
-        :class="{
-          'note-tree-item--active': isItemActive(item),
-          'note-tree-item--drag-over': isDragOver(item),
-          'note-tree-item--dragging': draggedItem?.value.path === item.value.path
-        }"
-        draggable="true"
-        @click="handleItemClick(item)"
-        @contextmenu.prevent="handleItemContextMenu($event, item)"
-        @dragstart="handleDragStart($event, item)"
-        @dragover="handleDragOver($event, item)"
-        @dragleave="handleDragLeave"
-        @dragend="handleDragEnd"
-        @drop="handleDrop($event, item)"
-      >
-        <!-- 文件夹展开/收起图标 -->
-        <UIcon
-          v-if="item.children?.length"
-          :name="isExpanded(item) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-          class="note-tree-toggle"
-        />
-        <span v-else class="note-tree-toggle-placeholder" />
-        
-        <!-- 文件/文件夹图标 -->
-        <UIcon
-          :name="item.icon"
-          class="note-tree-icon"
-        />
-        <span class="note-tree-label">{{ item.label }}</span>
-      </div>
-      
-      <!-- 子项（当展开时显示） -->
-      <div
-        v-if="item.children?.length && isExpanded(item)"
-        class="note-tree-children"
-      >
-        <template v-for="child in item.children" :key="child.value.id">
-          <div
-            class="note-tree-item note-tree-item--child"
-            :class="{
-              'note-tree-item--active': isItemActive(child),
-              'note-tree-item--drag-over': isDragOver(child),
-              'note-tree-item--dragging': draggedItem?.value.path === child.value.path
-            }"
-            draggable="true"
-            @click="handleItemClick(child)"
-            @contextmenu.prevent="handleItemContextMenu($event, child)"
-            @dragstart="handleDragStart($event, child)"
-            @dragover="handleDragOver($event, child)"
-            @dragleave="handleDragLeave"
-            @dragend="handleDragEnd"
-            @drop="handleDrop($event, child)"
-          >
-            <!-- 文件夹展开/收起图标 -->
-            <UIcon
-              v-if="child.children?.length"
-              :name="isExpanded(child) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-              class="note-tree-toggle"
-            />
-            <span v-else class="note-tree-toggle-placeholder" />
-            
-            <!-- 文件/文件夹图标 -->
-            <UIcon
-              :name="child.icon"
-              class="note-tree-icon"
-            />
-            <span class="note-tree-label">{{ child.label }}</span>
-          </div>
-        </template>
+  <draggable
+    v-model="localItems"
+    v-bind="dragOptions"
+    item-key="id"
+    tag="div"
+    class="note-tree-list"
+    @start="onDragStart"
+    @end="onDragEnd"
+    @change="onListChange"
+  >
+    <!-- 每个 item 只有一个根元素 -->
+    <template #item="{ element }">
+      <div class="note-tree-item-wrapper">
+        <!-- 笔记项 / 文件夹项 -->
+        <!-- 未展开的文件夹添加原生拖放事件，允许直接拖入 -->
+        <div
+          class="note-tree-item"
+          :class="{
+            'note-tree-item--active': activeTabPath === element.path,
+            'note-tree-item--folder': element.isFolder,
+            'note-tree-item--drag-over': element.isFolder && !isExpanded(element) && dragOverFolderPath === element.path
+          }"
+          :style="getIndentStyle()"
+          @click="handleItemClick(element)"
+          @contextmenu="(e) => handleContextMenu(e, element)"
+          @dragenter="element.isFolder && !isExpanded(element) ? handleFolderDragEnter($event, element) : undefined"
+          @dragover="element.isFolder && !isExpanded(element) ? handleFolderDragOver($event, element) : undefined"
+          @dragleave="element.isFolder && !isExpanded(element) ? handleFolderDragLeave($event, element) : undefined"
+          @drop="element.isFolder && !isExpanded(element) ? handleFolderDrop($event, element) : undefined"
+        >
+          <!-- 展开/折叠箭头 -->
+          <UIcon
+            v-if="element.isFolder"
+            :name="isExpanded(element) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+            class="note-tree-arrow"
+            @click.stop="toggleExpand(element)"
+          />
+          <span v-else class="note-tree-arrow-placeholder" />
+
+          <!-- 图标 -->
+          <UIcon
+            :name="element.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text'"
+            class="note-tree-icon"
+            :class="{ 'note-tree-icon--folder': element.isFolder }"
+          />
+
+          <!-- 名称 -->
+          <span class="note-tree-label">
+            {{ element.name.replace('.md', '') }}
+          </span>
+          
+          <!-- 拖放提示图标 - 仅在拖拽悬停时显示 -->
+          <UIcon
+            v-if="element.isFolder && !isExpanded(element) && dragOverFolderPath === element.path"
+            name="i-lucide-arrow-down-to-line"
+            class="note-tree-drop-hint"
+          />
+        </div>
+
+        <!-- 文件夹展开时的子项 -->
+        <div v-if="element.isFolder && isExpanded(element)" class="note-tree-children">
+          <NoteTree
+            :items="element.children || []"
+            :active-tab-path="activeTabPath"
+            :depth="depth + 1"
+            :parent-folder-path="element.path"
+            @select="(note) => emit('select', note)"
+            @contextmenu="(e, note) => emit('contextmenu', e, note)"
+            @move="(note, folder) => emit('move', note, folder)"
+          />
+        </div>
       </div>
     </template>
-  </div>
+  </draggable>
 </template>
 
 <style scoped>
-.note-tree {
+.note-tree-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  min-height: 4px;
+}
+
+.note-tree-item-wrapper {
+  user-select: none;
 }
 
 .note-tree-item {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.5rem;
+  gap: 4px;
+  padding: 6px 8px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
-  user-select: none;
 }
 
 .note-tree-item:hover {
@@ -281,38 +328,33 @@ const isDragOver = (item: NoteTreeItem): boolean => {
   font-weight: 500;
 }
 
-.note-tree-item--child {
-  padding-left: 1.75rem;
-}
-
-.note-tree-item--drag-over {
-  background-color: var(--accent-color);
-  opacity: 0.2;
-}
-
-.note-tree-item--dragging {
-  opacity: 0.5;
-}
-
-.note-tree-toggle {
-  width: 1rem;
-  height: 1rem;
+.note-tree-arrow {
+  width: 16px;
+  height: 16px;
   color: var(--text-mute);
   flex-shrink: 0;
-  opacity: 0.6;
+  transition: transform 0.15s ease;
+  cursor: pointer;
 }
 
-.note-tree-toggle-placeholder {
-  width: 1rem;
-  height: 1rem;
+.note-tree-arrow:hover {
+  color: var(--text-main);
+}
+
+.note-tree-arrow-placeholder {
+  width: 16px;
   flex-shrink: 0;
 }
 
 .note-tree-icon {
-  width: 1rem;
-  height: 1rem;
+  width: 16px;
+  height: 16px;
   color: var(--text-mute);
   flex-shrink: 0;
+}
+
+.note-tree-icon--folder {
+  color: var(--accent-color);
 }
 
 .note-tree-label {
@@ -325,8 +367,72 @@ const isDragOver = (item: NoteTreeItem): boolean => {
 }
 
 .note-tree-children {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  border-left: 1px solid var(--border-color);
+  margin-left: 8px;
+}
+
+/* 文件夹拖拽悬停高亮状态 */
+.note-tree-item--drag-over {
+  background-color: var(--highlight-bg);
+  outline: 2px dashed var(--accent-color);
+  outline-offset: -2px;
+}
+
+.note-tree-item--drag-over .note-tree-icon--folder {
+  color: var(--accent-color-hover);
+  transform: scale(1.1);
+}
+
+.note-tree-item--drag-over .note-tree-label {
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+/* 拖放提示图标 */
+.note-tree-drop-hint {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-color);
+  flex-shrink: 0;
+  margin-left: auto;
+  animation: drop-hint-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes drop-hint-pulse {
+  from {
+    opacity: 0.6;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+}
+
+/* 拖拽样式 */
+.note-tree-ghost {
+  opacity: 0.4;
+  background-color: var(--highlight-bg);
+  border-radius: 6px;
+}
+
+.note-tree-chosen {
+  background-color: var(--bg-sidebar);
+}
+
+.note-tree-drag {
+  opacity: 1;
+  background-color: var(--bg-paper);
+  box-shadow: 0 4px 12px var(--shadow-color-strong);
+  border-radius: 6px;
+}
+
+/* 全局拖拽状态 */
+:global(body.is-dragging) {
+  cursor: grabbing !important;
+}
+
+:global(body.is-dragging *) {
+  cursor: grabbing !important;
 }
 </style>
