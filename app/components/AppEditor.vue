@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import type { Editor } from '@tiptap/vue-3';
+
 const { activeTab, updateTabContent, saveTab } = useTabs();
 const { autoSaveDelay } = useSettings();
+
+// 编辑器引用
+const editorRef = useTemplateRef<{ editor: Editor }>('editorRef');
 
 // 编辑器内容（双向绑定用）
 const editorContent = ref('');
@@ -85,6 +90,12 @@ watch(
   { immediate: true, deep: true },
 );
 
+defineShortcuts({
+  meta_y: () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editorRef.value?.editor as any)?.chain().focus().redo().run();
+  },
+});
 // 清理定时器和事件监听
 onBeforeUnmount(() => {
   if (autoSaveTimer) {
@@ -149,6 +160,7 @@ const saveStatusInfo = computed(() => {
       <!-- Nuxt UI 编辑器 -->
       <ClientOnly v-else>
         <UEditor
+          ref="editorRef"
           :key="activeTab?.id"
           v-model="editorContent"
           content-type="markdown"
