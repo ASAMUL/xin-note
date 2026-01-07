@@ -63,7 +63,6 @@ watch(editorContent, (newContent) => {
 watch(() => activeTab.value, (tab) => {
   // 设置标志位，防止内容切换被误判为用户修改
   isSettingContent.value = true
-  console.log('Editor content changed:', tab)
   
   if (tab) {
     editorContent.value = tab.content || ''
@@ -159,6 +158,7 @@ const saveStatusInfo = computed(() => {
       <!-- Nuxt UI 编辑器 -->
       <ClientOnly v-else>
         <UEditor
+          :key="activeTab?.id"
           v-model="editorContent"
           content-type="markdown"
           class="nuxt-editor"
@@ -183,13 +183,11 @@ const saveStatusInfo = computed(() => {
 
 /* Nuxt UI 编辑器样式覆盖 */
 .nuxt-editor {
-  height: 100%;
   min-height: calc(100vh - 6rem);
 }
 
 /* 编辑器内容区域样式 */
 .nuxt-editor :deep(.ProseMirror) {
-  padding: 2rem;
   min-height: calc(100vh - 6rem);
   outline: none;
 }
