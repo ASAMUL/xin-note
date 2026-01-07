@@ -19,3 +19,5 @@ trigger: always_on
 # 关键：防止终端卡住
 
 Windows PowerShell 是默认终端，不要使用 cmd 命令或者 Linux 命令。
+
+# 我目前的环境是 electron，你不要用浏览器工具检查问题，检测不了的。

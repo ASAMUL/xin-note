@@ -216,6 +216,50 @@ function initIpc() {
     },
   );
 
+  /**
+   * 写入当前笔记目录下的 assets 文件（图片等二进制资源）
+   * - 策略：与 markdown 同目录创建 `assets/`
+   * - 返回：可直接写入 markdown 的相对路径：`assets/<fileName>`
+   */
+  ipcMain.handle(
+    'asset-write',
+    async (
+      _event,
+      {
+        notePath,
+        fileName,
+        data,
+      }: { notePath: string; fileName: string; data: ArrayBuffer | Uint8Array | number[] },
+    ) => {
+      try {
+        const noteDir = path.dirname(notePath);
+        const assetsDir = path.join(noteDir, 'assets');
+        await fs.mkdir(assetsDir, { recursive: true });
+
+        const absPath = path.join(assetsDir, fileName);
+        // 兼容 ArrayBuffer / Uint8Array / number[] 三种数据形态
+        const buffer = Buffer.isBuffer(data)
+          ? data
+          : data instanceof Uint8Array
+            ? Buffer.from(data)
+            : data instanceof ArrayBuffer
+              ? Buffer.from(new Uint8Array(data))
+              : Buffer.from(data);
+
+        await fs.writeFile(absPath, buffer);
+
+        return {
+          ok: true,
+          absPath,
+          relativePath: path.posix.join('assets', fileName),
+        };
+      } catch (error) {
+        console.error('写入 assets 资源失败:', error);
+        return { ok: false };
+      }
+    },
+  );
+
   // 创建新文件
   ipcMain.handle(
     'file-create',

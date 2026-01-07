@@ -6,6 +6,18 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
   modules: ['@pinia/nuxt', '@nuxt/ui', 'nuxt-electron', '@nuxt/fonts', '@nuxt/hints'],
+  vite: {
+    optimizeDeps: {
+      include: [
+        // 避免 prosemirror 多实例导致的 keyed plugin 错误（Nuxt UI Editor / TipTap 常见问题）
+        'prosemirror-state',
+        'prosemirror-transform',
+        'prosemirror-model',
+        'prosemirror-view',
+        'prosemirror-gapcursor',
+      ],
+    },
+  },
 
   // 页面和布局过渡动画
   app: {

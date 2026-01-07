@@ -7,6 +7,13 @@ export interface AppSettings {
   notesDirectory: string | null; // 笔记存储目录
   autoSaveDelay: number; // 自动保存延迟（毫秒）
   theme: 'light' | 'dark' | 'system';
+  /**
+   * AI 配置（前端直连，用户自行填写 key）
+   * 注意：这会写入本地 settings.json（位于 Electron userData 目录）
+   */
+  aiApiKey: string | null;
+  aiBaseUrl: string;
+  aiModel: string;
 }
 
 const CONFIG_FILE = 'settings.json';
@@ -16,6 +23,9 @@ const defaultSettings: AppSettings = {
   notesDirectory: null,
   autoSaveDelay: 1500,
   theme: 'system',
+  aiApiKey: null,
+  aiBaseUrl: 'https://api.openai.com/v1',
+  aiModel: 'gpt-4o-mini',
 };
 
 export function useSettings() {
@@ -102,6 +112,30 @@ export function useSettings() {
     await saveSettings(newSettings);
   };
 
+  // 更新 AI Key
+  const setAiApiKey = async (key: string | null) => {
+    const normalized = key?.trim() || null;
+    const newSettings = { ...settings.value, aiApiKey: normalized };
+    settings.value = newSettings;
+    await saveSettings(newSettings);
+  };
+
+  // 更新 AI Base URL
+  const setAiBaseUrl = async (url: string) => {
+    const normalized = url.trim().replace(/\/+$/, '');
+    const newSettings = { ...settings.value, aiBaseUrl: normalized || defaultSettings.aiBaseUrl };
+    settings.value = newSettings;
+    await saveSettings(newSettings);
+  };
+
+  // 更新 AI Model
+  const setAiModel = async (model: string) => {
+    const normalized = model.trim();
+    const newSettings = { ...settings.value, aiModel: normalized || defaultSettings.aiModel };
+    settings.value = newSettings;
+    await saveSettings(newSettings);
+  };
+
   // 重置设置
   const resetSettings = async () => {
     const newSettings = { ...defaultSettings };
@@ -119,12 +153,18 @@ export function useSettings() {
     notesDirectory: computed(() => settings.value.notesDirectory),
     autoSaveDelay: computed(() => settings.value.autoSaveDelay),
     theme: computed(() => settings.value.theme),
+    aiApiKey: computed(() => settings.value.aiApiKey),
+    aiBaseUrl: computed(() => settings.value.aiBaseUrl),
+    aiModel: computed(() => settings.value.aiModel),
     isInitialized: computed(() => isInitialized.value),
     loadSettings,
     setNotesDirectory,
     selectNotesDirectory,
     setAutoSaveDelay,
     setTheme,
+    setAiApiKey,
+    setAiBaseUrl,
+    setAiModel,
     resetSettings,
   };
 }

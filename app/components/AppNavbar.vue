@@ -1,7 +1,38 @@
 <script setup lang="ts">
 // 设置
-const { notesDirectory, selectNotesDirectory } = useSettings();
+const {
+  notesDirectory,
+  selectNotesDirectory,
+  aiApiKey,
+  aiBaseUrl,
+  aiModel,
+  setAiApiKey,
+  setAiBaseUrl,
+  setAiModel,
+} = useSettings();
 const showSettings = ref(false);
+
+// AI 设置（用草稿值编辑，点击保存后写入 settings.json）
+const aiKeyDraft = ref('');
+const aiBaseUrlDraft = ref('');
+const aiModelDraft = ref('');
+const showAiKey = ref(false);
+
+watch(
+  () => showSettings.value,
+  (open) => {
+    if (!open) return;
+    aiKeyDraft.value = aiApiKey.value || '';
+    aiBaseUrlDraft.value = aiBaseUrl.value || 'https://api.openai.com/v1';
+    aiModelDraft.value = aiModel.value || 'gpt-4o-mini';
+  },
+);
+
+const saveAiSettings = async () => {
+  await setAiBaseUrl(aiBaseUrlDraft.value);
+  await setAiModel(aiModelDraft.value);
+  await setAiApiKey(aiKeyDraft.value);
+};
 
 // 命令面板状态
 const searchOpen = ref(false);
@@ -281,6 +312,58 @@ const navItems = ref([
                   @click="selectNotesDirectory()"
                 >
                   {{ notesDirectory ? '更改' : '选择' }}
+                </UButton>
+              </div>
+            </div>
+
+            <!-- AI 配置 -->
+            <div class="settings-item">
+              <div class="settings-item-header">
+                <UIcon name="i-lucide-sparkles" class="w-4 h-4" />
+                <span class="settings-item-label">AI 配置</span>
+              </div>
+
+              <div class="flex flex-col gap-2">
+                <UInput
+                  v-model="aiBaseUrlDraft"
+                  size="sm"
+                  icon="i-lucide-link"
+                  placeholder="Base URL（例如 https://api.openai.com/v1）"
+                />
+                <UInput
+                  v-model="aiModelDraft"
+                  size="sm"
+                  icon="i-lucide-box"
+                  placeholder="模型（例如 gpt-4o-mini）"
+                />
+                <UInput
+                  v-model="aiKeyDraft"
+                  size="sm"
+                  :type="showAiKey ? 'text' : 'password'"
+                  icon="i-lucide-key"
+                  placeholder="API Key（仅保存在本地 settings.json）"
+                >
+                  <template #trailing>
+                    <UButton
+                      :icon="showAiKey ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                      variant="ghost"
+                      color="neutral"
+                      size="xs"
+                      @click="showAiKey = !showAiKey"
+                    />
+                  </template>
+                </UInput>
+              </div>
+
+              <div class="flex justify-end gap-2 mt-2">
+                <UButton
+                  variant="soft"
+                  color="primary"
+                  size="xs"
+                  icon="i-lucide-save"
+                  @click="saveAiSettings"
+                >
+                  保存
                 </UButton>
               </div>
             </div>

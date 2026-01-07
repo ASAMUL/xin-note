@@ -18,6 +18,14 @@
     "@nuxt/icon": "^2.1.0",
     "@nuxt/ui": "^4.3.0",
     "@pinia/nuxt": "0.11.3",
+    "@tiptap/core": "3.13.0",
+    "@tiptap/extension-emoji": "3.13.0",
+    "@tiptap/extension-image": "3.13.0",
+    "@tiptap/markdown": "3.13.0",
+    "@tiptap/pm": "3.13.0",
+    "@tiptap/starter-kit": "3.13.0",
+    "@tiptap/suggestion": "3.13.0",
+    "@tiptap/vue-3": "3.13.0",
     "@vueuse/core": "^14.1.0",
     "@vueuse/integrations": "^14.1.0",
     "nuxt": "^4.2.2",
@@ -37,7 +45,15 @@
   },
   "pnpm": {
     "overrides": {
-      "@parcel/watcher": "2.4.1"
+      "@parcel/watcher": "2.4.1",
+      "@tiptap/core": "3.13.0",
+      "@tiptap/pm": "3.13.0",
+      "@tiptap/vue-3": "3.13.0",
+      "@tiptap/suggestion": "3.13.0",
+      "@tiptap/extension-image": "3.13.0",
+      "@tiptap/starter-kit": "3.13.0",
+      "@tiptap/markdown": "3.13.0",
+      "@tiptap/extension-emoji": "3.13.0"
     }
   }
 }
