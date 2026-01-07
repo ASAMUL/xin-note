@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
-  modules: ['@pinia/nuxt', '@nuxt/ui', 'nuxt-electron', '@nuxt/fonts'],
+  modules: ['@pinia/nuxt', '@nuxt/ui', 'nuxt-electron', '@nuxt/fonts', '@nuxt/hints'],
   fonts: {
     families: [
       { name: 'Inter', provider: 'google' },

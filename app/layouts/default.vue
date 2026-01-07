@@ -28,5 +28,8 @@ const { isAiSidebarOpen } = useLayoutState()
         <AiAssistant />
       </aside>
     </div>
+
+    <!-- Global Footer -->
+    <AppFooter />
   </div>
 </template>
