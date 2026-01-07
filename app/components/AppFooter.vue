@@ -4,7 +4,7 @@
  * 始终显示帮助图标，有打开的标签页时显示字数统计和时间信息
  */
 
-const { activeTab, hasOpenTabs } = useTabs()
+const { activeTab, hasOpenTabs } = useTabs();
 
 // 帮助菜单选项
 const helpMenuItems = ref([
@@ -14,7 +14,7 @@ const helpMenuItems = ref([
       icon: 'i-lucide-book-open',
       click: () => {
         // 占位功能
-        console.log('打开用户指南')
+        console.log('打开用户指南');
       },
     },
     {
@@ -22,7 +22,7 @@ const helpMenuItems = ref([
       icon: 'i-lucide-message-square',
       click: () => {
         // 占位功能
-        console.log('问题反馈')
+        console.log('问题反馈');
       },
     },
   ],
@@ -32,7 +32,7 @@ const helpMenuItems = ref([
       icon: 'i-lucide-settings',
       click: () => {
         // 占位功能
-        console.log('打开开发者工具')
+        console.log('打开开发者工具');
       },
     },
   ],
@@ -42,7 +42,7 @@ const helpMenuItems = ref([
       icon: 'i-lucide-globe',
       click: () => {
         // 占位功能
-        console.log('访问官方网站')
+        console.log('访问官方网站');
       },
     },
     {
@@ -50,59 +50,59 @@ const helpMenuItems = ref([
       icon: 'i-simple-icons-github',
       click: () => {
         // 占位功能
-        console.log('访问 GitHub')
+        console.log('访问 GitHub');
       },
     },
   ],
-])
+]);
 
 // 计算字符数（包括空格）
 const charCount = computed(() => {
-  if (!activeTab.value?.content) return 0
-  return activeTab.value.content.length
-})
+  if (!activeTab.value?.content) return 0;
+  return activeTab.value.content.length;
+});
 
 // 计算字数（中文按字算，英文按单词算）
 const wordCount = computed(() => {
-  if (!activeTab.value?.content) return 0
-  const content = activeTab.value.content.trim()
-  if (!content) return 0
-  
+  if (!activeTab.value?.content) return 0;
+  const content = activeTab.value.content.trim();
+  if (!content) return 0;
+
   // 中文字符
-  const chineseChars = content.match(/[\u4e00-\u9fa5]/g) || []
+  const chineseChars = content.match(/[\u4e00-\u9fa5]/g) || [];
   // 英文单词（连续的英文字母）
-  const englishWords = content.match(/[a-zA-Z]+/g) || []
-  
-  return chineseChars.length + englishWords.length
-})
+  const englishWords = content.match(/[a-zA-Z]+/g) || [];
+
+  return chineseChars.length + englishWords.length;
+});
 
 // 计算行数
 const lineCount = computed(() => {
-  if (!activeTab.value?.content) return 0
-  return activeTab.value.content.split('\n').length
-})
+  if (!activeTab.value?.content) return 0;
+  return activeTab.value.content.split('\n').length;
+});
 
 // 格式化时间显示
 const formatTime = (isoString?: string): string => {
-  if (!isoString) return '未知'
-  const date = new Date(isoString)
+  if (!isoString) return '未知';
+  const date = new Date(isoString);
   return date.toLocaleString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  })
-}
+  });
+};
 
 // 创建时间显示
 const createdAtText = computed(() => {
-  return formatTime(activeTab.value?.createdAt)
-})
+  return formatTime(activeTab.value?.createdAt);
+});
 
 // 修改时间显示
 const modifiedAtText = computed(() => {
-  return formatTime(activeTab.value?.modifiedAt)
-})
+  return formatTime(activeTab.value?.modifiedAt);
+});
 </script>
 
 <template>

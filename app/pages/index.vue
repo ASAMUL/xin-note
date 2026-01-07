@@ -1,3 +1,3 @@
 <template>
-    <AppEditor />
+  <AppEditor />
 </template>

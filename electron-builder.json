@@ -1,36 +1,26 @@
-
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "cn.illumine.note.cn",
-  "productName": "illumine", 
+  "productName": "illumine",
   "asar": true,
   "directories": {
     "output": "release/${version}"
   },
-  "files": [
-    ".output/**/*",
-    "dist-electron",
-    "!**/*.map",
-    "!**/*.d.ts" 
-  ],
+  "files": [".output/**/*", "dist-electron", "!**/*.map", "!**/*.d.ts"],
   "mac": {
     "artifactName": "${productName}_${version}.${ext}",
-    "target": [
-      "dmg"
-    ]
+    "target": ["dmg"]
   },
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": [
-          "x64"
-        ]
+        "arch": ["x64"]
       }
     ],
     "artifactName": "${productName}_${version}.${ext}"
   },
- "nsis": {
+  "nsis": {
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
@@ -38,6 +28,6 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "shortcutName": "illumine",
-    "guid": "xxxx-xxxx-xxxx-xxx1" 
+    "guid": "xxxx-xxxx-xxxx-xxx1"
   }
 }

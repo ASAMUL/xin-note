@@ -3,61 +3,61 @@
  * 命令面板组件
  * 提供快速搜索和执行命令的功能
  */
-import type { NoteItem } from '~/composables/useNotes'
+import type { NoteItem } from '~/composables/useNotes';
 
 // Props 定义
 const props = defineProps<{
-  open: boolean
-}>()
+  open: boolean;
+}>();
 
 // Emits 定义
 const emit = defineEmits<{
-  (e: 'update:open', value: boolean): void
-  (e: 'openSettings'): void
-}>()
+  (e: 'update:open', value: boolean): void;
+  (e: 'openSettings'): void;
+}>();
 
 // 组合式函数
-const { notesDirectory } = useSettings()
-const { openTabs, openTab, openTabByPath, saveTab, activeTab } = useTabs()
-const { notes, createNote } = useNotes()
+const { notesDirectory } = useSettings();
+const { openTabs, openTab, openTabByPath, saveTab, activeTab } = useTabs();
+const { notes, createNote } = useNotes();
 
 // 内部状态
 const isOpen = computed({
   get: () => props.open,
-  set: (value) => emit('update:open', value)
-})
+  set: (value) => emit('update:open', value),
+});
 
 // 扁平化笔记列表（用于搜索）
 const flattenNotes = (noteList: NoteItem[]): NoteItem[] => {
-  const result: NoteItem[] = []
+  const result: NoteItem[] = [];
   for (const note of noteList) {
     if (!note.isFolder) {
-      result.push(note)
+      result.push(note);
     }
     if (note.children?.length) {
-      result.push(...flattenNotes(note.children))
+      result.push(...flattenNotes(note.children));
     }
   }
-  return result
-}
+  return result;
+};
 
 // 获取相对路径用于显示后缀
 const getRelativePath = (filePath: string): string => {
-  if (!notesDirectory.value) return ''
-  const relativePath = filePath.replace(notesDirectory.value, '').replace(/\\/g, '/')
-  const parts = relativePath.split('/')
-  parts.pop() // 移除文件名
-  return parts.join('/').replace(/^\//, '') || '根目录'
-}
+  if (!notesDirectory.value) return '';
+  const relativePath = filePath.replace(notesDirectory.value, '').replace(/\\/g, '/');
+  const parts = relativePath.split('/');
+  parts.pop(); // 移除文件名
+  return parts.join('/').replace(/^\//, '') || '根目录';
+};
 
 // 关闭命令面板
 const closePanel = () => {
-  isOpen.value = false
-}
+  isOpen.value = false;
+};
 
 // 命令面板分组
 const commandGroups = computed(() => {
-  const groups: any[] = []
+  const groups: any[] = [];
 
   // 1. 操作命令组
   groups.push({
@@ -70,9 +70,9 @@ const commandGroups = computed(() => {
         icon: 'i-lucide-file-plus',
         kbds: ['ctrl', 'N'],
         onSelect: async () => {
-          closePanel()
-          await createNote()
-        }
+          closePanel();
+          await createNote();
+        },
       },
       {
         id: 'action-save',
@@ -82,9 +82,9 @@ const commandGroups = computed(() => {
         kbds: ['ctrl', 'S'],
         disabled: !activeTab.value,
         onSelect: async () => {
-          closePanel()
-          await saveTab()
-        }
+          closePanel();
+          await saveTab();
+        },
       },
       {
         id: 'action-ai',
@@ -93,9 +93,9 @@ const commandGroups = computed(() => {
         icon: 'i-lucide-sparkles',
         kbds: ['ctrl', 'L'],
         onSelect: () => {
-          closePanel()
+          closePanel();
           // TODO: 打开 AI 助手
-        }
+        },
       },
       {
         id: 'action-settings',
@@ -104,60 +104,60 @@ const commandGroups = computed(() => {
         icon: 'i-lucide-settings',
         kbds: ['ctrl', ','],
         onSelect: () => {
-          closePanel()
-          emit('openSettings')
-        }
-      }
-    ]
-  })
+          closePanel();
+          emit('openSettings');
+        },
+      },
+    ],
+  });
 
   // 2. 最近文档组（当前打开的标签页）
   if (openTabs.value.length > 0) {
     groups.push({
       id: 'recent',
       label: '已打开的文档',
-      items: openTabs.value.map(tab => ({
+      items: openTabs.value.map((tab) => ({
         id: `recent-${tab.id}`,
         label: tab.name.replace('.md', ''),
         suffix: getRelativePath(tab.path),
         icon: tab.isModified ? 'i-lucide-file-edit' : 'i-lucide-file-text',
         active: tab.id === activeTab.value?.id,
         onSelect: async () => {
-          closePanel()
-          await openTabByPath(tab.path)
-        }
-      }))
-    })
+          closePanel();
+          await openTabByPath(tab.path);
+        },
+      })),
+    });
   }
 
   // 3. 全部笔记组
-  const allNotes = flattenNotes(notes.value)
+  const allNotes = flattenNotes(notes.value);
   if (allNotes.length > 0) {
     groups.push({
       id: 'notes',
       label: '全部笔记',
-      items: allNotes.map(note => ({
+      items: allNotes.map((note) => ({
         id: `note-${note.id}`,
         label: note.name.replace('.md', ''),
         suffix: getRelativePath(note.path),
         icon: 'i-lucide-file-text',
         onSelect: async () => {
-          closePanel()
-          await openTab(note)
-        }
-      }))
-    })
+          closePanel();
+          await openTab(note);
+        },
+      })),
+    });
   }
 
-  return groups
-})
+  return groups;
+});
 
 // 处理命令选择
 const handleCommandSelect = (item: any) => {
   if (item?.onSelect) {
-    item.onSelect()
+    item.onSelect();
   }
-}
+};
 
 // 快捷键现在由 useShortcuts composable 统一管理
 </script>
@@ -165,19 +165,19 @@ const handleCommandSelect = (item: any) => {
 <template>
   <UModal v-model:open="isOpen" :ui="{ content: 'max-w-xl' }">
     <template #content>
-      <UCommandPalette 
+      <UCommandPalette
         placeholder="搜索笔记、命令..."
         :groups="commandGroups"
-        :fuse="{ 
-          fuseOptions: { 
+        :fuse="{
+          fuseOptions: {
             keys: ['label', 'suffix'],
-            threshold: 0.3 
-          } 
+            threshold: 0.3,
+          },
         }"
         class="command-palette"
         :ui="{
           input: 'h-12',
-          viewport: 'max-h-80'
+          viewport: 'max-h-80',
         }"
         @update:model-value="handleCommandSelect"
       >

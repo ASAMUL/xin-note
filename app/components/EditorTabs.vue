@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import type { TabItem } from '~/composables/useTabs'
+import type { TabItem } from '~/composables/useTabs';
 
 // 接收保存状态信息
 interface SaveStatusInfo {
-  icon: string
-  text: string
-  color: string
+  icon: string;
+  text: string;
+  color: string;
 }
 
 const props = defineProps<{
-  saveStatusInfo?: SaveStatusInfo
-  saveStatus?: 'saved' | 'saving' | 'unsaved'
-}>()
+  saveStatusInfo?: SaveStatusInfo;
+  saveStatus?: 'saved' | 'saving' | 'unsaved';
+}>();
 
 const {
   openTabs,
@@ -24,24 +24,24 @@ const {
   switchTab,
   showTabInExplorer,
   copyTabPath,
-} = useTabs()
+} = useTabs();
 
 // 为每个标签页生成右键菜单项
 const getContextMenuItems = (tab: TabItem) => {
-  const tabIndex = openTabs.value.findIndex(t => t.id === tab.id)
-  
+  const tabIndex = openTabs.value.findIndex((t) => t.id === tab.id);
+
   return [
     [
       {
         label: '关闭',
         icon: 'i-lucide-x',
-        onSelect: () => closeTab(tab.id)
+        onSelect: () => closeTab(tab.id),
       },
       {
         label: '关闭其他',
         icon: 'i-lucide-x-circle',
         disabled: openTabs.value.length <= 1,
-        onSelect: () => closeOtherTabs(tab.id)
+        onSelect: () => closeOtherTabs(tab.id),
       },
     ],
     [
@@ -49,39 +49,39 @@ const getContextMenuItems = (tab: TabItem) => {
         label: '关闭左侧',
         icon: 'i-lucide-arrow-left-to-line',
         disabled: tabIndex === 0,
-        onSelect: () => closeTabsToLeft(tab.id)
+        onSelect: () => closeTabsToLeft(tab.id),
       },
       {
         label: '关闭右侧',
         icon: 'i-lucide-arrow-right-to-line',
         disabled: tabIndex === openTabs.value.length - 1,
-        onSelect: () => closeTabsToRight(tab.id)
+        onSelect: () => closeTabsToRight(tab.id),
       },
       {
         label: '关闭全部',
         icon: 'i-lucide-x-square',
-        onSelect: () => closeAllTabs()
+        onSelect: () => closeAllTabs(),
       },
     ],
     [
       {
         label: '复制路径',
         icon: 'i-lucide-link',
-        onSelect: () => copyTabPath(tab.id)
+        onSelect: () => copyTabPath(tab.id),
       },
       {
         label: '在资源管理器中显示',
         icon: 'i-lucide-folder-open',
-        onSelect: () => showTabInExplorer(tab.id)
+        onSelect: () => showTabInExplorer(tab.id),
       },
     ],
-  ]
-}
+  ];
+};
 
 // 获取显示名称（去除 .md 后缀）
 const getDisplayName = (name: string) => {
-  return name.replace(/\.md$/i, '')
-}
+  return name.replace(/\.md$/i, '');
+};
 </script>
 
 <template>
@@ -95,11 +95,7 @@ const getDisplayName = (name: string) => {
 
       <!-- 标签页列表 -->
       <div v-else class="tabs-list">
-        <UContextMenu
-          v-for="tab in openTabs"
-          :key="tab.id"
-          :items="getContextMenuItems(tab)"
-        >
+        <UContextMenu v-for="tab in openTabs" :key="tab.id" :items="getContextMenuItems(tab)">
           <div
             class="tab-item"
             :class="{ 'tab-item--active': tab.id === activeTabId }"
@@ -107,17 +103,13 @@ const getDisplayName = (name: string) => {
           >
             <!-- 文件图标 -->
             <UIcon name="i-lucide-file-text" class="tab-icon" />
-            
+
             <!-- 文件名 -->
             <span class="tab-name">{{ getDisplayName(tab.name) }}</span>
-            
+
             <!-- 修改指示器 / 关闭按钮 -->
             <div class="tab-actions ml-3">
-              <UIcon 
-                v-if="tab.isModified" 
-                name="i-lucide-circle" 
-                class="modified-indicator"
-              />
+              <UIcon v-if="tab.isModified" name="i-lucide-circle" class="modified-indicator" />
               <UButton
                 variant="ghost"
                 color="neutral"
@@ -135,10 +127,10 @@ const getDisplayName = (name: string) => {
 
     <!-- 右侧保存状态（仅当有打开的标签页时显示） -->
     <div v-if="openTabs.length > 0 && saveStatusInfo" class="save-status">
-      <UIcon 
+      <UIcon
         v-if="saveStatusInfo.icon"
-        :name="saveStatusInfo.icon" 
-        class="w-3.5 h-3.5" 
+        :name="saveStatusInfo.icon"
+        class="w-3.5 h-3.5"
         :class="[saveStatusInfo.color, { 'animate-spin': saveStatus === 'saving' }]"
       />
       <span class="save-status-text" :class="saveStatusInfo.color">{{ saveStatusInfo.text }}</span>

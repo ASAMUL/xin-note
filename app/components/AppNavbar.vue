@@ -1,86 +1,94 @@
 <script setup lang="ts">
 // 设置
-const { notesDirectory, selectNotesDirectory } = useSettings()
-const showSettings = ref(false)
+const { notesDirectory, selectNotesDirectory } = useSettings();
+const showSettings = ref(false);
 
 // 命令面板状态
-const searchOpen = ref(false)
+const searchOpen = ref(false);
 
 // 笔记操作
-const { createNote } = useNotes()
+const { createNote } = useNotes();
 
 // Tab 操作（用于保存快捷键）
-const { saveTab } = useTabs()
+const { saveTab } = useTabs();
 
 // 全局快捷键注册（集中管理所有快捷键回调）
 useShortcuts({
-  onOpenSettings: () => { showSettings.value = true },
-  onOpenSearch: () => { searchOpen.value = true },
-  onCreateNote: () => { createNote() },
-  onSaveNote: () => { saveTab() },
-})
+  onOpenSettings: () => {
+    showSettings.value = true;
+  },
+  onOpenSearch: () => {
+    searchOpen.value = true;
+  },
+  onCreateNote: () => {
+    createNote();
+  },
+  onSaveNote: () => {
+    saveTab();
+  },
+});
 
 // 窗口控制
-const isMaximized = ref(false)
+const isMaximized = ref(false);
 
 // 初始化时获取最大化状态
 onMounted(async () => {
   if (window.ipcRenderer) {
-    isMaximized.value = await window.ipcRenderer.invoke('window-is-maximized')
+    isMaximized.value = await window.ipcRenderer.invoke('window-is-maximized');
   }
-})
+});
 
 const minimizeWindow = () => {
-  window.ipcRenderer?.send('window-minimize')
-}
+  window.ipcRenderer?.send('window-minimize');
+};
 
 const toggleMaximize = async () => {
-  window.ipcRenderer?.send('window-toggle-maximize')
+  window.ipcRenderer?.send('window-toggle-maximize');
   // 延迟获取最新状态
-  await nextTick()
+  await nextTick();
   if (window.ipcRenderer) {
-    isMaximized.value = await window.ipcRenderer.invoke('window-is-maximized')
+    isMaximized.value = await window.ipcRenderer.invoke('window-is-maximized');
   }
-}
+};
 
 // 关闭确认弹窗
-const { closeAction, setCloseAction } = useWindowPreferences()
-const showCloseConfirm = ref(false)
-const rememberChoice = ref(false)
+const { closeAction, setCloseAction } = useWindowPreferences();
+const showCloseConfirm = ref(false);
+const rememberChoice = ref(false);
 
 // 处理关闭按钮点击
 const handleCloseClick = () => {
   // 如果用户已设置偏好，直接执行
   if (closeAction.value === 'minimize') {
-    minimizeWindow()
-    return
+    minimizeWindow();
+    return;
   }
   if (closeAction.value === 'close') {
-    window.ipcRenderer?.send('window-close')
-    return
+    window.ipcRenderer?.send('window-close');
+    return;
   }
   // 否则显示确认弹窗
-  showCloseConfirm.value = true
-  rememberChoice.value = false
-}
+  showCloseConfirm.value = true;
+  rememberChoice.value = false;
+};
 
 // 执行最小化
 const doMinimize = () => {
   if (rememberChoice.value) {
-    setCloseAction('minimize')
+    setCloseAction('minimize');
   }
-  showCloseConfirm.value = false
-  minimizeWindow()
-}
+  showCloseConfirm.value = false;
+  minimizeWindow();
+};
 
 // 执行关闭
 const doClose = () => {
   if (rememberChoice.value) {
-    setCloseAction('close')
+    setCloseAction('close');
   }
-  showCloseConfirm.value = false
-  window.ipcRenderer?.send('window-close')
-}
+  showCloseConfirm.value = false;
+  window.ipcRenderer?.send('window-close');
+};
 
 // 导航菜单项
 const navItems = ref([
@@ -92,8 +100,8 @@ const navItems = ref([
       { label: '打开...', icon: 'i-lucide-folder-open' },
       { type: 'separator' },
       { label: '保存', icon: 'i-lucide-save', shortcut: 'Ctrl+S' },
-      { label: '另存为...', icon: 'i-lucide-save-all' }
-    ]
+      { label: '另存为...', icon: 'i-lucide-save-all' },
+    ],
   },
   {
     label: '编辑',
@@ -104,8 +112,8 @@ const navItems = ref([
       { type: 'separator' },
       { label: '剪切', icon: 'i-lucide-scissors', shortcut: 'Ctrl+X' },
       { label: '复制', icon: 'i-lucide-copy', shortcut: 'Ctrl+C' },
-      { label: '粘贴', icon: 'i-lucide-clipboard', shortcut: 'Ctrl+V' }
-    ]
+      { label: '粘贴', icon: 'i-lucide-clipboard', shortcut: 'Ctrl+V' },
+    ],
   },
   {
     label: '视图',
@@ -115,8 +123,8 @@ const navItems = ref([
       { label: '禅模式', icon: 'i-lucide-focus' },
       { type: 'separator' },
       { label: '侧边栏', icon: 'i-lucide-panel-left' },
-      { label: 'AI 助手', icon: 'i-lucide-sparkles', shortcut: 'Ctrl+L' }
-    ]
+      { label: 'AI 助手', icon: 'i-lucide-sparkles', shortcut: 'Ctrl+L' },
+    ],
   },
   {
     label: '帮助',
@@ -125,11 +133,10 @@ const navItems = ref([
       { label: '快捷键', icon: 'i-lucide-keyboard' },
       { label: '文档', icon: 'i-lucide-book-open' },
       { type: 'separator' },
-      { label: '关于 Lumina', icon: 'i-lucide-info' }
-    ]
-  }
-])
-
+      { label: '关于 Lumina', icon: 'i-lucide-info' },
+    ],
+  },
+]);
 </script>
 
 <template>
@@ -149,12 +156,12 @@ const navItems = ref([
 
       <!-- 导航菜单 -->
       <nav class="nav-menu">
-        <UNavigationMenu 
-          :items="navItems" 
+        <UNavigationMenu
+          :items="navItems"
           variant="link"
           :ui="{
             link: 'px-2.5 py-1.5 text-xs font-medium',
-            linkLeadingIcon: 'hidden'
+            linkLeadingIcon: 'hidden',
           }"
         />
       </nav>
@@ -174,18 +181,13 @@ const navItems = ref([
       <!-- 工具栏 -->
       <div class="toolbar">
         <UTooltip text="同步">
-          <UButton 
-            variant="ghost" 
-            color="neutral" 
-            size="xs" 
-            icon="i-lucide-cloud"
-          />
+          <UButton variant="ghost" color="neutral" size="xs" icon="i-lucide-cloud" />
         </UTooltip>
         <UTooltip text="设置">
-          <UButton 
-            variant="ghost" 
-            color="neutral" 
-            size="xs" 
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="xs"
             icon="i-lucide-settings"
             @click="showSettings = true"
           />
@@ -197,7 +199,11 @@ const navItems = ref([
         <button class="control-btn" @click="minimizeWindow" title="最小化">
           <UIcon name="i-lucide-minus" class="w-4 h-4" />
         </button>
-        <button class="control-btn" @click="toggleMaximize" :title="isMaximized ? '还原' : '最大化'">
+        <button
+          class="control-btn"
+          @click="toggleMaximize"
+          :title="isMaximized ? '还原' : '最大化'"
+        >
           <UIcon :name="isMaximized ? 'i-lucide-copy' : 'i-lucide-square'" class="w-3.5 h-3.5" />
         </button>
         <button class="control-btn control-btn--close" @click="handleCloseClick" title="关闭">
@@ -207,10 +213,7 @@ const navItems = ref([
     </div>
 
     <!-- 搜索命令面板 -->
-    <CommandPalette 
-      v-model:open="searchOpen" 
-      @open-settings="showSettings = true"
-    />
+    <CommandPalette v-model:open="searchOpen" @open-settings="showSettings = true" />
 
     <!-- 关闭确认弹窗 -->
     <UModal v-model:open="showCloseConfirm">
@@ -270,9 +273,9 @@ const navItems = ref([
               <div class="settings-item-value">
                 <span v-if="notesDirectory" class="directory-path">{{ notesDirectory }}</span>
                 <span v-else class="directory-empty">未设置</span>
-                <UButton 
-                  variant="soft" 
-                  color="primary" 
+                <UButton
+                  variant="soft"
+                  color="primary"
                   size="xs"
                   icon="i-lucide-folder-open"
                   @click="selectNotesDirectory()"

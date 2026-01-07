@@ -1,14 +1,14 @@
 <script setup lang="ts">
-const { toggleAiSidebar } = useLayoutState()
+const { toggleAiSidebar } = useLayoutState();
 
 onMounted(() => {
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.key === 'l') {
-      e.preventDefault()
-      toggleAiSidebar()
+      e.preventDefault();
+      toggleAiSidebar();
     }
-  })
-})
+  });
+});
 </script>
 
 <template>

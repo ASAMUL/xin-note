@@ -1,9 +1,12 @@
 <script setup lang="ts">
-const { isAiSidebarOpen } = useLayoutState()
+const { isAiSidebarOpen } = useLayoutState();
 </script>
 
 <template>
-  <div class="h-screen w-screen overflow-hidden flex flex-col" style="background-color: var(--bg-app); color: var(--text-main);">
+  <div
+    class="h-screen w-screen overflow-hidden flex flex-col"
+    style="background-color: var(--bg-app); color: var(--text-main)"
+  >
     <!-- Top Navbar -->
     <AppNavbar />
 
@@ -20,10 +23,10 @@ const { isAiSidebarOpen } = useLayoutState()
       </main>
 
       <!-- Right Sidebar (AI) -->
-      <aside 
-        v-if="isAiSidebarOpen" 
+      <aside
+        v-if="isAiSidebarOpen"
         class="w-80 flex-shrink-0 transition-all duration-300 ease-in-out"
-        style="border-left: 1px solid var(--border-color);"
+        style="border-left: 1px solid var(--border-color)"
       >
         <AiAssistant />
       </aside>

@@ -1,137 +1,137 @@
-@import "@nuxt/ui";
-@import "tailwindcss";
+@import '@nuxt/ui';
+@import 'tailwindcss';
 
 /* ========================================
    主题颜色系统 - 暖调护眼 (羊皮纸/书房风格)
    ======================================== */
 
 :root {
-    /* 背景色系 */
-    --bg-app: #F0EEE5;       /* 应用底色：灰暖色 */
-    --bg-sidebar: #E8E5DC;   /* 侧边栏：稍深 */
-    --bg-paper: #FAF9F6;     /* 纸张：云峰白 */
-    --bg-popup: #FFFFFF;     /* 弹窗背景 */
-    
-    /* 边框与分隔 */
-    --border-color: #D6D3C9;
-    
-    /* 文字色系 */
-    --text-main: #332F2C;    /* 文字：墨色 */
-    --text-mute: #857F78;    /* 弱化文字 */
-    
-    /* 强调色 */
-    --highlight-bg: #FEF3C7; /* 高亮背景 */
-    --accent-color: #B8860B; /* 金棕强调色 */
-    --accent-hover: #9A7209;
+  /* 背景色系 */
+  --bg-app: #f0eee5; /* 应用底色：灰暖色 */
+  --bg-sidebar: #e8e5dc; /* 侧边栏：稍深 */
+  --bg-paper: #faf9f6; /* 纸张：云峰白 */
+  --bg-popup: #ffffff; /* 弹窗背景 */
 
-    /* ====== 语义化颜色（按用途分类） ====== */
-    
-    /* 错误/危险色 - 用于删除、错误提示、关闭按钮等 */
-    --color-error: #DC2626;
-    --color-error-hover: #B91C1C;
-    --color-error-bg: #FEE2E2;
-    --color-error-bg-subtle: #FEF2F2;
-    
-    /* 成功色 - 用于保存成功、完成状态等 */
-    --color-success: #16A34A;
-    --color-success-hover: #15803D;
-    --color-success-bg: #DCFCE7;
-    --color-success-bg-subtle: #F0FDF4;
-    
-    /* 警告色 - 用于未保存、注意提示等 */
-    --color-warning: #F59E0B;
-    --color-warning-hover: #D97706;
-    --color-warning-bg: #FEF3C7;
-    --color-warning-bg-subtle: #FFFBEB;
-    
-    /* 信息色 - 用于提示、链接、选中状态等 */
-    --color-info: #3B82F6;
-    --color-info-hover: #2563EB;
-    --color-info-bg: #DBEAFE;
-    --color-info-bg-subtle: #EFF6FF;
-    
-    /* 阴影色 - 用于 box-shadow */
-    --shadow-color: rgba(0, 0, 0, 0.1);
-    --shadow-color-strong: rgba(0, 0, 0, 0.15);
+  /* 边框与分隔 */
+  --border-color: #d6d3c9;
+
+  /* 文字色系 */
+  --text-main: #332f2c; /* 文字：墨色 */
+  --text-mute: #857f78; /* 弱化文字 */
+
+  /* 强调色 */
+  --highlight-bg: #fef3c7; /* 高亮背景 */
+  --accent-color: #b8860b; /* 金棕强调色 */
+  --accent-hover: #9a7209;
+
+  /* ====== 语义化颜色（按用途分类） ====== */
+
+  /* 错误/危险色 - 用于删除、错误提示、关闭按钮等 */
+  --color-error: #dc2626;
+  --color-error-hover: #b91c1c;
+  --color-error-bg: #fee2e2;
+  --color-error-bg-subtle: #fef2f2;
+
+  /* 成功色 - 用于保存成功、完成状态等 */
+  --color-success: #16a34a;
+  --color-success-hover: #15803d;
+  --color-success-bg: #dcfce7;
+  --color-success-bg-subtle: #f0fdf4;
+
+  /* 警告色 - 用于未保存、注意提示等 */
+  --color-warning: #f59e0b;
+  --color-warning-hover: #d97706;
+  --color-warning-bg: #fef3c7;
+  --color-warning-bg-subtle: #fffbeb;
+
+  /* 信息色 - 用于提示、链接、选中状态等 */
+  --color-info: #3b82f6;
+  --color-info-hover: #2563eb;
+  --color-info-bg: #dbeafe;
+  --color-info-bg-subtle: #eff6ff;
+
+  /* 阴影色 - 用于 box-shadow */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --shadow-color-strong: rgba(0, 0, 0, 0.15);
 }
 
 .dark {
-    /* 深色：静谧深夜 */
-    --bg-app: #0F0F10;
-    --bg-sidebar: #161618;
-    --bg-paper: #1A1A1C;     
-    --bg-popup: #1F1F22;
-    
-    --border-color: #27272A;
-    
-    --text-main: #E4E4E7;
-    --text-mute: #71717A;
-    
-    --highlight-bg: #3F2C06;
-    --accent-color: #D4A017;
-    --accent-hover: #E8B423;
+  /* 深色：静谧深夜 */
+  --bg-app: #0f0f10;
+  --bg-sidebar: #161618;
+  --bg-paper: #1a1a1c;
+  --bg-popup: #1f1f22;
 
-    /* ====== 语义化颜色（深色模式） ====== */
-    
-    /* 错误/危险色 */
-    --color-error: #F87171;
-    --color-error-hover: #FCA5A5;
-    --color-error-bg: #450A0A;
-    --color-error-bg-subtle: #2D0A0A;
-    
-    /* 成功色 */
-    --color-success: #4ADE80;
-    --color-success-hover: #86EFAC;
-    --color-success-bg: #052E16;
-    --color-success-bg-subtle: #022C22;
-    
-    /* 警告色 */
-    --color-warning: #FACC15;
-    --color-warning-hover: #FDE047;
-    --color-warning-bg: #422006;
-    --color-warning-bg-subtle: #2D1A06;
-    
-    /* 信息色 */
-    --color-info: #60A5FA;
-    --color-info-hover: #93C5FD;
-    --color-info-bg: #1E3A5F;
-    --color-info-bg-subtle: #172554;
-    
-    /* 阴影色 - 深色模式需要更强的阴影 */
-    --shadow-color: rgba(0, 0, 0, 0.3);
-    --shadow-color-strong: rgba(0, 0, 0, 0.5);
+  --border-color: #27272a;
+
+  --text-main: #e4e4e7;
+  --text-mute: #71717a;
+
+  --highlight-bg: #3f2c06;
+  --accent-color: #d4a017;
+  --accent-hover: #e8b423;
+
+  /* ====== 语义化颜色（深色模式） ====== */
+
+  /* 错误/危险色 */
+  --color-error: #f87171;
+  --color-error-hover: #fca5a5;
+  --color-error-bg: #450a0a;
+  --color-error-bg-subtle: #2d0a0a;
+
+  /* 成功色 */
+  --color-success: #4ade80;
+  --color-success-hover: #86efac;
+  --color-success-bg: #052e16;
+  --color-success-bg-subtle: #022c22;
+
+  /* 警告色 */
+  --color-warning: #facc15;
+  --color-warning-hover: #fde047;
+  --color-warning-bg: #422006;
+  --color-warning-bg-subtle: #2d1a06;
+
+  /* 信息色 */
+  --color-info: #60a5fa;
+  --color-info-hover: #93c5fd;
+  --color-info-bg: #1e3a5f;
+  --color-info-bg-subtle: #172554;
+
+  /* 阴影色 - 深色模式需要更强的阴影 */
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --shadow-color-strong: rgba(0, 0, 0, 0.5);
 }
 
 /* ========================================
    Tailwind 主题扩展
    ======================================== */
 
-@theme static{
-    /* 主色调 - 暖金棕 */
-    --color-primary-50: #FFFBEB;
-    --color-primary-100: #FEF3C7;
-    --color-primary-200: #FDE68A;
-    --color-primary-300: #FCD34D;
-    --color-primary-400: #FBBF24;
-    --color-primary-500: #D4A017;
-    --color-primary-600: #B8860B;
-    --color-primary-700: #9A7209;
-    --color-primary-800: #7C5C07;
-    --color-primary-900: #5E4506;
-    --color-primary-950: #3F2C06;
+@theme static {
+  /* 主色调 - 暖金棕 */
+  --color-primary-50: #fffbeb;
+  --color-primary-100: #fef3c7;
+  --color-primary-200: #fde68a;
+  --color-primary-300: #fcd34d;
+  --color-primary-400: #fbbf24;
+  --color-primary-500: #d4a017;
+  --color-primary-600: #b8860b;
+  --color-primary-700: #9a7209;
+  --color-primary-800: #7c5c07;
+  --color-primary-900: #5e4506;
+  --color-primary-950: #3f2c06;
 
-    /* 中性色 - 暖灰/羊皮纸色调 */
-    --color-neutral-50: #FAF9F6;
-    --color-neutral-100: #F0EEE5;
-    --color-neutral-200: #E8E5DC;
-    --color-neutral-300: #D6D3C9;
-    --color-neutral-400: #B0ACA5;
-    --color-neutral-500: #857F78;
-    --color-neutral-600: #6D6862;
-    --color-neutral-700: #54504C;
-    --color-neutral-800: #3B3835;
-    --color-neutral-900: #332F2C;
-    --color-neutral-950: #1F1C1A;
+  /* 中性色 - 暖灰/羊皮纸色调 */
+  --color-neutral-50: #faf9f6;
+  --color-neutral-100: #f0eee5;
+  --color-neutral-200: #e8e5dc;
+  --color-neutral-300: #d6d3c9;
+  --color-neutral-400: #b0aca5;
+  --color-neutral-500: #857f78;
+  --color-neutral-600: #6d6862;
+  --color-neutral-700: #54504c;
+  --color-neutral-800: #3b3835;
+  --color-neutral-900: #332f2c;
+  --color-neutral-950: #1f1c1a;
 }
 
 /* ========================================
@@ -139,11 +139,11 @@
    ======================================== */
 
 body {
-    background-color: var(--bg-app);
-    color: var(--text-main);
+  background-color: var(--bg-app);
+  color: var(--text-main);
 }
 @theme {
-  --font-sans: "LXGW WenKai TC", "sans-serif";
+  --font-sans: 'LXGW WenKai TC', 'sans-serif';
 }
 
 /* ========================================
@@ -151,97 +151,106 @@ body {
    ======================================== */
 
 .tiptap {
-    outline: none;
-    caret-color: var(--accent-color);
+  outline: none;
+  caret-color: var(--accent-color);
 }
 
 .tiptap p {
-    margin: 0.75em 0;
-    line-height: 1.75;
+  margin: 0.75em 0;
+  line-height: 1.75;
 }
 
-.tiptap h1, .tiptap h2, .tiptap h3 {
-    color: var(--text-main);
-    font-weight: 600;
-    line-height: 1.3;
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
+.tiptap h1,
+.tiptap h2,
+.tiptap h3 {
+  color: var(--text-main);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
 }
 
-.tiptap h1 { font-size: 2em; }
-.tiptap h2 { font-size: 1.5em; }
-.tiptap h3 { font-size: 1.25em; }
+.tiptap h1 {
+  font-size: 2em;
+}
+.tiptap h2 {
+  font-size: 1.5em;
+}
+.tiptap h3 {
+  font-size: 1.25em;
+}
 
 .tiptap blockquote {
-    border-left: 3px solid var(--color-primary-300);
-    padding-left: 1em;
-    margin-left: 0;
-    color: var(--text-mute);
-    font-style: italic;
+  border-left: 3px solid var(--color-primary-300);
+  padding-left: 1em;
+  margin-left: 0;
+  color: var(--text-mute);
+  font-style: italic;
 }
 
 .tiptap code {
-    background-color: var(--highlight-bg);
-    padding: 0.2em 0.4em;
-    border-radius: 0.25em;
-    font-size: 0.875em;
+  background-color: var(--highlight-bg);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-size: 0.875em;
 }
 
 .tiptap pre {
-    background-color: var(--bg-sidebar);
-    padding: 1em;
-    border-radius: 0.5em;
-    overflow-x: auto;
+  background-color: var(--bg-sidebar);
+  padding: 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
 }
 
 .tiptap pre code {
-    background: none;
-    padding: 0;
+  background: none;
+  padding: 0;
 }
 
-.tiptap ul, .tiptap ol {
-    padding-left: 1.5em;
-    margin: 0.75em 0;
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.75em 0;
 }
 
 .tiptap li {
-    margin: 0.25em 0;
+  margin: 0.25em 0;
 }
 
 .tiptap a {
-    color: var(--accent-color);
-    text-decoration: underline;
+  color: var(--accent-color);
+  text-decoration: underline;
 }
 
 .tiptap a:hover {
-    color: var(--accent-hover);
+  color: var(--accent-hover);
 }
 
 .tiptap ::selection {
-    background-color: var(--highlight-bg);
+  background-color: var(--highlight-bg);
 }
 
 /* Prose 样式覆盖 - 让 prose 使用主题色 */
 .prose {
-    --tw-prose-body: var(--text-main);
-    --tw-prose-headings: var(--text-main);
-    --tw-prose-links: var(--accent-color);
-    --tw-prose-bold: var(--text-main);
-    --tw-prose-quotes: var(--text-mute);
-    --tw-prose-quote-borders: var(--accent-color);
-    --tw-prose-code: var(--text-main);
-    --tw-prose-pre-bg: var(--bg-sidebar);
+  --tw-prose-body: var(--text-main);
+  --tw-prose-headings: var(--text-main);
+  --tw-prose-links: var(--accent-color);
+  --tw-prose-bold: var(--text-main);
+  --tw-prose-quotes: var(--text-mute);
+  --tw-prose-quote-borders: var(--accent-color);
+  --tw-prose-code: var(--text-main);
+  --tw-prose-pre-bg: var(--bg-sidebar);
 }
 
 .dark .prose {
-    --tw-prose-invert-body: var(--text-main);
-    --tw-prose-invert-headings: var(--text-main);
-    --tw-prose-invert-links: var(--accent-color);
-    --tw-prose-invert-bold: var(--text-main);
-    --tw-prose-invert-quotes: var(--text-mute);
-    --tw-prose-invert-quote-borders: var(--accent-color);
-    --tw-prose-invert-code: var(--text-main);
-    --tw-prose-invert-pre-bg: var(--bg-sidebar);
+  --tw-prose-invert-body: var(--text-main);
+  --tw-prose-invert-headings: var(--text-main);
+  --tw-prose-invert-links: var(--accent-color);
+  --tw-prose-invert-bold: var(--text-main);
+  --tw-prose-invert-quotes: var(--text-mute);
+  --tw-prose-invert-quote-borders: var(--accent-color);
+  --tw-prose-invert-code: var(--text-main);
+  --tw-prose-invert-pre-bg: var(--bg-sidebar);
 }
 /* ========================================
    全局滚动条样式

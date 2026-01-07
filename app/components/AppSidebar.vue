@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import type { NoteItem } from '~/composables/useNotes'
+import type { NoteItem } from '~/composables/useNotes';
 
-const { 
-  notes, 
+const {
+  notes,
   isLoading,
   createNote,
   createFolder,
-  renameNote, 
+  renameNote,
   deleteNote,
   moveNote,
   showInExplorer,
-  copyPath 
-} = useNotes()
-const { openTab, activeTab } = useTabs()
-const { notesDirectory, selectNotesDirectory } = useSettings()
+  copyPath,
+} = useNotes();
+const { openTab, activeTab } = useTabs();
+const { notesDirectory, selectNotesDirectory } = useSettings();
 
 // 右键菜单状态
-const contextMenuOpen = ref(false)
-const contextMenuTarget = ref<NoteItem | null>(null)
-const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuOpen = ref(false);
+const contextMenuTarget = ref<NoteItem | null>(null);
+const contextMenuPosition = ref({ x: 0, y: 0 });
 
 // 右键菜单项
 const contextMenuItems = computed(() => [
@@ -26,183 +26,186 @@ const contextMenuItems = computed(() => [
     {
       label: '在编辑器中打开',
       icon: 'i-lucide-file-edit',
-      onSelect: () => contextMenuTarget.value && openTab(contextMenuTarget.value)
-    }
+      onSelect: () => contextMenuTarget.value && openTab(contextMenuTarget.value),
+    },
   ],
   [
     {
       label: '新建笔记',
       icon: 'i-lucide-file-plus',
-      onSelect: () => handleCreateNote()
+      onSelect: () => handleCreateNote(),
     },
     {
       label: '新建文件夹',
       icon: 'i-lucide-folder-plus',
-      onSelect: () => showCreateFolderDialog()
-    }
+      onSelect: () => showCreateFolderDialog(),
+    },
   ],
   [
     {
       label: '复制路径',
       icon: 'i-lucide-link',
-      onSelect: () => contextMenuTarget.value && copyPath(contextMenuTarget.value)
+      onSelect: () => contextMenuTarget.value && copyPath(contextMenuTarget.value),
     },
     {
       label: '重命名',
       icon: 'i-lucide-pencil',
-      onSelect: () => startRename()
-    }
+      onSelect: () => startRename(),
+    },
   ],
   [
     {
       label: '在资源管理器中显示',
       icon: 'i-lucide-folder-open',
-      onSelect: () => contextMenuTarget.value && showInExplorer(contextMenuTarget.value)
-    }
+      onSelect: () => contextMenuTarget.value && showInExplorer(contextMenuTarget.value),
+    },
   ],
   [
     {
       label: '删除',
       icon: 'i-lucide-trash-2',
       color: 'error' as const,
-      onSelect: () => confirmDelete()
-    }
-  ]
-])
+      onSelect: () => confirmDelete(),
+    },
+  ],
+]);
 
 // 重命名状态
-const isRenaming = ref(false)
-const renameValue = ref('')
-const renameTarget = ref<NoteItem | null>(null)
+const isRenaming = ref(false);
+const renameValue = ref('');
+const renameTarget = ref<NoteItem | null>(null);
 
 const startRename = () => {
   if (contextMenuTarget.value) {
-    renameTarget.value = contextMenuTarget.value
-    renameValue.value = contextMenuTarget.value.name.replace('.md', '')
-    isRenaming.value = true
+    renameTarget.value = contextMenuTarget.value;
+    renameValue.value = contextMenuTarget.value.name.replace('.md', '');
+    isRenaming.value = true;
   }
-}
+};
 
 const confirmRename = async () => {
   if (renameTarget.value && renameValue.value.trim()) {
-    await renameNote(renameTarget.value, renameValue.value.trim())
+    await renameNote(renameTarget.value, renameValue.value.trim());
   }
-  isRenaming.value = false
-  renameTarget.value = null
-}
+  isRenaming.value = false;
+  renameTarget.value = null;
+};
 
 const cancelRename = () => {
-  isRenaming.value = false
-  renameTarget.value = null
-}
+  isRenaming.value = false;
+  renameTarget.value = null;
+};
 
 // 删除确认
-const showDeleteConfirm = ref(false)
-const deleteTarget = ref<NoteItem | null>(null)
+const showDeleteConfirm = ref(false);
+const deleteTarget = ref<NoteItem | null>(null);
 
 const confirmDelete = () => {
-  deleteTarget.value = contextMenuTarget.value
-  showDeleteConfirm.value = true
-}
+  deleteTarget.value = contextMenuTarget.value;
+  showDeleteConfirm.value = true;
+};
 
 const doDelete = async () => {
   if (deleteTarget.value) {
-    await deleteNote(deleteTarget.value)
+    await deleteNote(deleteTarget.value);
   }
-  showDeleteConfirm.value = false
-  deleteTarget.value = null
-}
+  showDeleteConfirm.value = false;
+  deleteTarget.value = null;
+};
 
 // 处理右键菜单
 const handleContextMenu = (event: MouseEvent, note: NoteItem) => {
-  event.preventDefault()
-  contextMenuTarget.value = note
-  contextMenuPosition.value = { x: event.clientX, y: event.clientY }
-  contextMenuOpen.value = true
-}
+  event.preventDefault();
+  contextMenuTarget.value = note;
+  contextMenuPosition.value = { x: event.clientX, y: event.clientY };
+  contextMenuOpen.value = true;
+};
 
 // 新建笔记（考虑当前选中位置）
 const handleCreateNote = async () => {
   if (!notesDirectory.value) {
     // 如果没有设置目录，提示用户先设置
-    await selectNotesDirectory()
+    await selectNotesDirectory();
   }
   if (notesDirectory.value) {
     // 根据当前活动 tab 确定创建位置（tab 只能是文件，获取其所在目录）
-    let parentDir: string | undefined
+    let parentDir: string | undefined;
     if (activeTab.value) {
-      const path = activeTab.value.path
-      parentDir = path.substring(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')))
+      const path = activeTab.value.path;
+      parentDir = path.substring(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')));
     }
-    await createNote('未命名笔记.md', parentDir)
+    await createNote('未命名笔记.md', parentDir);
   }
-}
+};
 
 // 从头部按钮创建文件夹（考虑当前选中位置）
 const handleHeaderCreateFolder = () => {
   // 根据当前活动 tab 确定创建位置（tab 只能是文件，获取其所在目录）
   if (activeTab.value) {
-    const path = activeTab.value.path
-    const parentPath = path.substring(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')))
-    contextMenuTarget.value = { path: parentPath, isFolder: true } as NoteItem
+    const path = activeTab.value.path;
+    const parentPath = path.substring(0, Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/')));
+    contextMenuTarget.value = { path: parentPath, isFolder: true } as NoteItem;
   } else {
-    contextMenuTarget.value = null
+    contextMenuTarget.value = null;
   }
-  showCreateFolderDialog()
-}
+  showCreateFolderDialog();
+};
 
 // 新建文件夹弹窗
-const showCreateFolder = ref(false)
-const newFolderName = ref('')
+const showCreateFolder = ref(false);
+const newFolderName = ref('');
 
 const showCreateFolderDialog = () => {
-  newFolderName.value = ''
-  showCreateFolder.value = true
-}
+  newFolderName.value = '';
+  showCreateFolder.value = true;
+};
 
 const confirmCreateFolder = async () => {
   if (newFolderName.value.trim()) {
     // 确定创建位置：如果右键点击的是文件夹则在其内部创建，如果是文件则在其所在目录创建
-    let parentDir: string | undefined
+    let parentDir: string | undefined;
     if (contextMenuTarget.value) {
       if (contextMenuTarget.value.isFolder) {
         // 在文件夹内部创建
-        parentDir = contextMenuTarget.value.path
+        parentDir = contextMenuTarget.value.path;
       } else {
         // 在文件所在目录创建（获取父目录路径）
-        const path = contextMenuTarget.value.path
-        parentDir = path.substring(0, path.lastIndexOf('\\') > -1 ? path.lastIndexOf('\\') : path.lastIndexOf('/'))
+        const path = contextMenuTarget.value.path;
+        parentDir = path.substring(
+          0,
+          path.lastIndexOf('\\') > -1 ? path.lastIndexOf('\\') : path.lastIndexOf('/'),
+        );
       }
     }
-    await createFolder(newFolderName.value.trim(), parentDir)
+    await createFolder(newFolderName.value.trim(), parentDir);
   }
-  showCreateFolder.value = false
-  newFolderName.value = ''
-}
+  showCreateFolder.value = false;
+  newFolderName.value = '';
+};
 
 const cancelCreateFolder = () => {
-  showCreateFolder.value = false
-  newFolderName.value = ''
-}
+  showCreateFolder.value = false;
+  newFolderName.value = '';
+};
 
 // 处理笔记选择
 const handleNoteSelect = (note: NoteItem) => {
   if (!note.isFolder) {
-    openTab(note)
+    openTab(note);
   }
-}
+};
 
 // 处理笔记移动（拖拽到文件夹）
 const handleNoteMove = async (note: NoteItem, targetFolderPath: string) => {
   if (targetFolderPath) {
-    await moveNote(note, targetFolderPath)
+    await moveNote(note, targetFolderPath);
   }
-}
+};
 
 // 选择目录包装函数
 const handleSelectDirectory = async () => {
-  await selectNotesDirectory()
-}
+  await selectNotesDirectory();
+};
 </script>
 
 <template>
@@ -215,28 +218,28 @@ const handleSelectDirectory = async () => {
       </h2>
       <div class="sidebar-actions">
         <UTooltip text="刷新">
-          <UButton 
-            variant="ghost" 
-            color="neutral" 
-            size="xs" 
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="xs"
             icon="i-lucide-refresh-cw"
             @click="useNotes().loadNotes()"
           />
         </UTooltip>
         <UTooltip text="新建文件夹">
-          <UButton 
-            variant="ghost" 
-            color="neutral" 
-            size="xs" 
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="xs"
             icon="i-lucide-folder-plus"
             @click="handleHeaderCreateFolder"
           />
         </UTooltip>
         <UTooltip text="新建笔记">
-          <UButton 
-            variant="ghost" 
-            color="neutral" 
-            size="xs" 
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="xs"
             icon="i-lucide-file-plus"
             @click="handleCreateNote"
           />
@@ -250,8 +253,8 @@ const handleSelectDirectory = async () => {
       <div v-if="!notesDirectory" class="empty-state">
         <UIcon name="i-lucide-folder-plus" class="w-12 h-12 empty-icon" />
         <p class="empty-text">请先设置笔记存储目录</p>
-        <UButton 
-          variant="soft" 
+        <UButton
+          variant="soft"
           color="primary"
           size="sm"
           icon="i-lucide-folder-open"
@@ -271,8 +274,8 @@ const handleSelectDirectory = async () => {
       <div v-else-if="notes.length === 0" class="empty-state">
         <UIcon name="i-lucide-file-plus" class="w-12 h-12 empty-icon" />
         <p class="empty-text">还没有笔记</p>
-        <UButton 
-          variant="soft" 
+        <UButton
+          variant="soft"
           color="primary"
           size="sm"
           icon="i-lucide-plus"
@@ -304,7 +307,7 @@ const handleSelectDirectory = async () => {
     >
       <template #default>
         <!-- 隐藏的触发器，位置通过 CSS 控制 -->
-        <div 
+        <div
           ref="contextMenuTrigger"
           class="context-menu-trigger"
           :style="{ left: contextMenuPosition.x + 'px', top: contextMenuPosition.y + 'px' }"
@@ -317,8 +320,8 @@ const handleSelectDirectory = async () => {
       <template #content>
         <div class="rename-dialog">
           <h3 class="dialog-title">重命名笔记</h3>
-          <UInput 
-            v-model="renameValue" 
+          <UInput
+            v-model="renameValue"
             placeholder="输入新名称"
             class="w-full"
             autofocus
@@ -342,10 +345,14 @@ const handleSelectDirectory = async () => {
           </div>
           <h3 class="dialog-title">确认删除</h3>
           <p class="dialog-message">
-            确定要删除 "<strong>{{ deleteTarget?.name.replace('.md', '') }}</strong>" 吗？此操作无法撤销。
+            确定要删除 "
+            <strong>{{ deleteTarget?.name.replace('.md', '') }}</strong>
+            " 吗？此操作无法撤销。
           </p>
           <div class="dialog-actions">
-            <UButton variant="ghost" color="neutral" @click="showDeleteConfirm = false">取消</UButton>
+            <UButton variant="ghost" color="neutral" @click="showDeleteConfirm = false">
+              取消
+            </UButton>
             <UButton color="error" @click="doDelete">删除</UButton>
           </div>
         </div>
@@ -357,8 +364,8 @@ const handleSelectDirectory = async () => {
       <template #content>
         <div class="rename-dialog">
           <h3 class="dialog-title">新建文件夹</h3>
-          <UInput 
-            v-model="newFolderName" 
+          <UInput
+            v-model="newFolderName"
             placeholder="输入文件夹名称"
             class="w-full"
             autofocus
