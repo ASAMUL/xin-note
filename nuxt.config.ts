@@ -6,6 +6,13 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
   modules: ['@pinia/nuxt', '@nuxt/ui', 'nuxt-electron', '@nuxt/fonts', '@nuxt/hints'],
+
+  // 页面和布局过渡动画
+  app: {
+    pageTransition: { name: 'page', mode: 'out-in' },
+    layoutTransition: { name: 'layout', mode: 'out-in' },
+  },
+
   fonts: {
     families: [
       { name: 'Inter', provider: 'google' },

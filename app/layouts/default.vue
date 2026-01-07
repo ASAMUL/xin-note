@@ -1,10 +1,22 @@
 <script setup lang="ts">
 const { isAiSidebarOpen } = useLayoutState();
+
+// 控制主内容区淡入
+const isAppReady = ref(false);
+
+// 在 app 完全初始化后触发
+onNuxtReady(() => {
+  isAppReady.value = true;
+});
 </script>
 
 <template>
+  <!-- 启动画面 -->
+  <AppLaunchScreen />
+
   <div
-    class="h-screen w-screen overflow-hidden flex flex-col"
+    class="h-screen w-screen overflow-hidden flex flex-col app-container"
+    :class="{ 'app-ready': isAppReady }"
     style="background-color: var(--bg-app); color: var(--text-main)"
   >
     <!-- Top Navbar -->
@@ -23,16 +35,48 @@ const { isAiSidebarOpen } = useLayoutState();
       </main>
 
       <!-- Right Sidebar (AI) -->
-      <aside
-        v-if="isAiSidebarOpen"
-        class="w-80 flex-shrink-0 transition-all duration-300 ease-in-out"
-        style="border-left: 1px solid var(--border-color)"
-      >
-        <AiAssistant />
-      </aside>
+      <Transition name="slide-fade-right">
+        <aside
+          v-if="isAiSidebarOpen"
+          class="w-80 flex-shrink-0"
+          style="border-left: 1px solid var(--border-color)"
+        >
+          <AiAssistant />
+        </aside>
+      </Transition>
     </div>
 
     <!-- Global Footer -->
     <AppFooter />
   </div>
 </template>
+
+<style scoped>
+/* 主容器淡入效果 */
+.app-container {
+  opacity: 0;
+  transform: scale(0.98);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-container.app-ready {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* AI 侧边栏滑入效果 */
+.slide-fade-right-enter-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-fade-right-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.slide-fade-right-enter-from,
+.slide-fade-right-leave-to {
+  opacity: 0;
+  transform: translateX(40px);
+}
+</style>

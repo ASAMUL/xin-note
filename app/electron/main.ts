@@ -36,9 +36,34 @@ function createWindow() {
     frame: false,
     transparent: true,
     center: true,
+    show: false, // 初始隐藏，等待内容加载后显示
     webPreferences: {
       preload: path.join(MAIN_DIST, 'preload.js'),
     },
+  });
+
+  // 窗口淡入动画：内容加载完成后优雅显示
+  win.once('ready-to-show', () => {
+    if (!win) return;
+
+    // 先设置透明度为 0
+    win.setOpacity(0);
+    win.show();
+
+    // 使用动画逐渐增加透明度实现淡入效果
+    let opacity = 0;
+    const fadeIn = setInterval(() => {
+      if (!win) {
+        clearInterval(fadeIn);
+        return;
+      }
+      opacity += 0.1;
+      if (opacity >= 1) {
+        opacity = 1;
+        clearInterval(fadeIn);
+      }
+      win.setOpacity(opacity);
+    }, 25); // 约 250ms 完成淡入
   });
 
   // 在主进程捕获快捷键，然后通过 IPC 发送给渲染进程

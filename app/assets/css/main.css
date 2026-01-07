@@ -1,5 +1,6 @@
 @import '@nuxt/ui';
 @import 'tailwindcss';
+@import './transition.css';
 
 /* ========================================
    主题颜色系统 - 暖调护眼 (羊皮纸/书房风格)
