@@ -13,10 +13,12 @@ export interface ShortcutOptions {
   onOpenSearch?: () => void;
   /** 创建新笔记的回调 */
   onCreateNote?: () => void;
+  /** 保存笔记的回调 */
+  onSaveNote?: () => void;
 }
 
 export function useShortcuts(options: ShortcutOptions = {}) {
-  const { onOpenSettings, onOpenSearch, onCreateNote } = options;
+  const { onOpenSettings, onOpenSearch, onCreateNote, onSaveNote } = options;
 
   // 双击 Shift 检测相关状态
   const lastShiftTime = ref(0);
@@ -35,6 +37,10 @@ export function useShortcuts(options: ShortcutOptions = {}) {
         break;
       case 'create-note':
         onCreateNote?.();
+        break;
+      case 'save-note':
+        console.log('save-note');
+        onSaveNote?.();
         break;
     }
   };
@@ -67,7 +73,6 @@ export function useShortcuts(options: ShortcutOptions = {}) {
       window.ipcRenderer.on('shortcut-triggered', handleShortcutMessage);
     }
 
-    // 监听双击 Shift
     window.addEventListener('keydown', handleKeyDown);
   });
 
@@ -84,5 +89,6 @@ export function useShortcuts(options: ShortcutOptions = {}) {
     openSettings: () => onOpenSettings?.(),
     openSearch: () => onOpenSearch?.(),
     createNote: () => onCreateNote?.(),
+    saveFile: () => onSaveNote?.(),
   };
 }

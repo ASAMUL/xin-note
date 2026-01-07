@@ -13,6 +13,8 @@ export interface TabItem {
   path: string; // 文件路径
   isModified: boolean; // 是否有未保存修改
   content: string; // 编辑器内容
+  createdAt?: string; // 创建时间 (ISO 字符串)
+  modifiedAt?: string; // 修改时间 (ISO 字符串)
 }
 
 // 标签页状态接口
@@ -90,6 +92,9 @@ export function useTabs() {
       // 读取文件内容
       const content = (await window.ipcRenderer.invoke('file-read', filePath)) || '';
 
+      // 获取文件时间元数据
+      const fileStat = await window.ipcRenderer.invoke('file-stat', filePath);
+
       // 从路径提取文件名
       const pathParts = filePath.replace(/\\/g, '/').split('/');
       const fileName = pathParts[pathParts.length - 1] || 'unknown';
@@ -103,6 +108,8 @@ export function useTabs() {
         path: filePath,
         isModified: false,
         content,
+        createdAt: fileStat?.createdAt,
+        modifiedAt: fileStat?.modifiedAt,
       };
 
       state.value.openTabs.push(newTab);
@@ -188,11 +195,18 @@ export function useTabs() {
       return;
     }
 
-    // 读取文件内容
+    // 读取文件内容和元数据
     let content = '';
+    let createdAt: string | undefined;
+    let modifiedAt: string | undefined;
     if (window.ipcRenderer) {
       try {
         content = (await window.ipcRenderer.invoke('file-read', note.path)) || '';
+        const fileStat = await window.ipcRenderer.invoke('file-stat', note.path);
+        if (fileStat) {
+          createdAt = fileStat.createdAt;
+          modifiedAt = fileStat.modifiedAt;
+        }
       } catch (error) {
         console.error('读取文件失败:', error);
       }
@@ -205,6 +219,8 @@ export function useTabs() {
       path: note.path,
       isModified: false,
       content,
+      createdAt,
+      modifiedAt,
     };
 
     // 添加到标签页列表并激活
@@ -344,6 +360,8 @@ export function useTabs() {
         content: tab.content,
       });
       tab.isModified = false;
+      // 更新修改时间为当前时间
+      tab.modifiedAt = new Date().toISOString();
       return true;
     } catch (error) {
       console.error('保存文件失败:', error);

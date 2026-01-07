@@ -63,11 +63,17 @@ function createWindow() {
       win?.webContents.send('shortcut-triggered', 'create-note');
       return;
     }
-
-    // Ctrl/Cmd + . - 打开设置
-    if (isModKey && input.key === '.') {
+    // Ctrl/Cmd + , - 打开设置
+    if (isModKey && input.key === ',') {
       event.preventDefault();
       win?.webContents.send('shortcut-triggered', 'open-settings');
+      return;
+    }
+
+    // Ctrl/Cmd + S - 保存当前笔记
+    if (isModKey && input.key.toLowerCase() === 's') {
+      event.preventDefault();
+      win?.webContents.send('shortcut-triggered', 'save-note');
       return;
     }
   });
@@ -221,6 +227,20 @@ function initIpc() {
     } catch (error) {
       console.error('检查文件是否存在失败:', error);
       return false;
+    }
+  });
+
+  // 获取文件元数据（创建时间、修改时间）
+  ipcMain.handle('file-stat', async (_event, filePath: string) => {
+    try {
+      const stat = statSync(filePath);
+      return {
+        createdAt: stat.birthtime.toISOString(),
+        modifiedAt: stat.mtime.toISOString(),
+      };
+    } catch (error) {
+      console.error('获取文件元数据失败:', error);
+      return null;
     }
   });
 

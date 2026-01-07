@@ -9,11 +9,15 @@ const searchOpen = ref(false)
 // 笔记操作
 const { createNote } = useNotes()
 
-// 全局快捷键注册
+// Tab 操作（用于保存快捷键）
+const { saveTab } = useTabs()
+
+// 全局快捷键注册（集中管理所有快捷键回调）
 useShortcuts({
   onOpenSettings: () => { showSettings.value = true },
   onOpenSearch: () => { searchOpen.value = true },
   onCreateNote: () => { createNote() },
+  onSaveNote: () => { saveTab() },
 })
 
 // 窗口控制
