@@ -144,7 +144,7 @@ body {
   color: var(--text-main);
 }
 @theme {
-  --font-sans: 'LXGW WenKai TC', 'sans-serif';
+  --font-sans: 'JetBrains Mono', 'sans-serif';
 }
 
 /* ========================================

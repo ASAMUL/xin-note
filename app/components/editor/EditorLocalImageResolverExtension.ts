@@ -3,7 +3,8 @@ import { Plugin } from '@tiptap/pm/state';
 
 export interface LocalImageResolverOptions {
   /**
-   * 把原始 src（通常是 markdown 里的相对路径 assets/xxx.png）解析为可显示的 URL（例如 file:///...）
+   * 把原始 src（通常是 markdown 里的相对路径 assets/xxx.png）解析为可显示的 URL
+   * 推荐返回自定义协议，例如 lumina-asset://...
    * 返回 null/空字符串表示不处理
    */
   resolve: (src: string) => string | null | undefined;
@@ -11,8 +12,7 @@ export interface LocalImageResolverOptions {
 
 /**
  * 运行时“显示层”修复：
- * - markdown 里保留相对路径（便携）
- * - Electron 渲染时把 <img src="assets/..."> 改成 <img src="file:///...">，从而能显示本地图片
+ * - markdown 里保留相对路径
  *
  * 注意：这是 DOM 层面的修复，不修改文档内容/不会影响保存的 markdown。
  */

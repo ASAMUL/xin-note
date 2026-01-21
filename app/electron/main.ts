@@ -1,7 +1,27 @@
-import { app, BrowserWindow, ipcMain, screen, dialog, shell, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, dialog, shell, clipboard, protocol } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { existsSync, statSync, readdirSync } from 'node:fs';
+
+/**
+ * 让渲染进程可以安全加载本地 assets 图片：
+ * - dev 时渲染页是 http://localhost，Chromium 会禁止直接加载 file:///...
+ * - 通过自定义协议 lumina-asset:// 映射到本地文件，避免 “Not allowed to load local resource”
+ *
+ * 注意：registerSchemesAsPrivileged 必须在 app ready 之前调用
+ */
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'lumina-asset',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 
 // The built directory structure
 //
@@ -22,6 +42,46 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
   : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+
+function registerAssetProtocol() {
+  // 允许通过 <img src="lumina-asset://local/<encodedAbsPath>"> 加载本地图片
+  // - encodedAbsPath = encodeURIComponent('C:/.../assets/xxx.png')
+  protocol.registerFileProtocol('lumina-asset', (request, callback) => {
+    try {
+      const u = new URL(request.url);
+      let filePath = '';
+
+      // 推荐格式：lumina-asset://local/<encodedAbsPath>
+      if (u.hostname === 'local') {
+        const encoded = (u.pathname || '').replace(/^\/+/, ''); // 去掉前导 /
+        const decoded = decodeURIComponent(encoded);
+        filePath = path.normalize(decoded);
+      } else {
+        // 兼容旧格式/异常解析：lumina-asset://c/Users/... （盘符被当成 host）
+        // 还原为 C:/Users/...
+        const host = (u.hostname || '').toString();
+        const pathname = decodeURIComponent(u.pathname || '');
+        if (/^[a-z]$/i.test(host)) {
+          filePath = path.normalize(`${host.toUpperCase()}:${pathname}`);
+        } else {
+          // 兜底：尝试直接把 pathname 当路径
+          filePath = path.normalize(pathname);
+        }
+      }
+
+      // 安全兜底：仅允许访问 assets 目录下的文件
+      if (!/(^|[\\/])assets[\\/]/i.test(filePath)) {
+        console.warn('[lumina-asset] blocked path:', filePath);
+        return callback({ error: -10 }); // net::ERR_ACCESS_DENIED
+      }
+
+      return callback({ path: filePath });
+    } catch (error) {
+      console.error('[lumina-asset] resolve error:', error);
+      return callback({ error: -324 }); // net::ERR_INVALID_URL
+    }
+  });
+}
 
 function createWindow() {
   // Use the display nearest to current cursor (better for multi-monitor setups).
@@ -467,6 +527,7 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
+  registerAssetProtocol();
   initIpc();
   createWindow();
 });
