@@ -38,6 +38,9 @@ export function useTabs() {
     activeTabId: null,
   }));
 
+  // 路径比较：Windows 下兼容 \ / 和大小写差异
+  const normalizePathForCompare = (p: string) => p.replace(/\\/g, '/').toLowerCase();
+
   // 初始化状态也使用 useState 确保全局唯一
   const isWorkspaceRestored = useState<boolean>('workspace-restored', () => false);
   const isRestoring = useState<boolean>('workspace-restoring', () => false);
@@ -131,6 +134,53 @@ export function useTabs() {
     if (tab) {
       await closeTab(tab.id);
     }
+  };
+
+  /**
+   * 文件重命名：同步更新对应标签页的 path / name
+   * - 用 oldPath 匹配（因为工作区恢复后 tab.id 可能不是 note.id）
+   * - 如果历史遗留导致出现重复 tab（同 path 多条），这里会一次性全部修复
+   */
+  const renameTabByPath = async (oldPath: string, newPath: string, newName?: string) => {
+    const oldKey = normalizePathForCompare(oldPath);
+    const tabs = state.value.openTabs.filter((t) => normalizePathForCompare(t.path) === oldKey);
+    if (tabs.length === 0) return false;
+
+    for (const tab of tabs) {
+      tab.path = newPath;
+      if (newName) tab.name = newName;
+    }
+
+    await saveWorkspace();
+    return true;
+  };
+
+  /**
+   * 文件夹重命名：同步更新该文件夹内所有打开标签页的路径
+   */
+  const renameTabsByFolder = async (oldFolderPath: string, newFolderPath: string) => {
+    const oldFolderNorm = normalizePathForCompare(oldFolderPath).replace(/\/$/, '');
+    const newFolderNorm = newFolderPath.replace(/\\/g, '/').replace(/\/$/, '');
+    const desiredSep = newFolderPath.includes('\\') ? '\\' : '/';
+    let updated = false;
+
+    for (const tab of state.value.openTabs) {
+      const tabNorm = tab.path.replace(/\\/g, '/');
+      const tabKey = normalizePathForCompare(tabNorm);
+      const prefix = oldFolderNorm + '/';
+      if (tabKey.startsWith(prefix)) {
+        const relative = tabNorm.slice(prefix.length);
+        const nextNorm = `${newFolderNorm}/${relative}`;
+        tab.path = desiredSep === '\\' ? nextNorm.replace(/\//g, '\\') : nextNorm;
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await saveWorkspace();
+    }
+
+    return updated;
   };
 
   /**
@@ -414,6 +464,8 @@ export function useTabs() {
     showTabInExplorer,
     copyTabPath,
     closeTabByPath,
+    renameTabByPath,
+    renameTabsByFolder,
     restoreWorkspace,
     saveWorkspace,
   };

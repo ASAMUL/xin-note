@@ -146,15 +146,31 @@ export function useNotes() {
     if (!window.ipcRenderer) return false;
 
     try {
+      const oldPath = note.path;
+      // 文件：自动补齐 .md；文件夹：保持原样（避免把文件夹误改成 *.md）
+      const normalizedName = note.isFolder
+        ? newName
+        : newName.endsWith('.md')
+          ? newName
+          : `${newName}.md`;
+
       const newPath = await window.ipcRenderer.invoke('file-rename', {
-        oldPath: note.path,
-        newName: newName.endsWith('.md') ? newName : `${newName}.md`,
+        oldPath,
+        newName: normalizedName,
       });
 
       if (newPath) {
-        // 更新活动笔记
-        if (state.value.activeNote?.id === note.id) {
-          state.value.activeNote.name = newName;
+        
+        const { renameTabByPath, renameTabsByFolder } = useTabs();
+        if (note.isFolder) {
+          await renameTabsByFolder(oldPath, newPath);
+        } else {
+          await renameTabByPath(oldPath, newPath, normalizedName);
+        }
+
+        // 兼容旧逻辑：如果某处仍使用 activeNote，则同步更新（按 path 判断更稳）
+        if (state.value.activeNote && state.value.activeNote.path === oldPath) {
+          state.value.activeNote.name = normalizedName;
           state.value.activeNote.path = newPath;
         }
 
