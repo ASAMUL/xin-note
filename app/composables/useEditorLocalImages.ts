@@ -6,7 +6,7 @@ import type { TabItem } from '~/composables/useTabs';
 
 /**
  * 本地图片写入与显示（Electron）
- * - 上传/粘贴图片：写入当前笔记同目录 assets/，并在 markdown 里插入相对路径
+ * - 上传/粘贴图片：写入笔记根目录（notesDirectory）下的 assets/，并在 markdown 里插入相对路径
  * - 显示层：把 assets/xxx.png 解析成 lumina-asset://...（避免 dev 下 file:/// 被 Chromium 禁止）
  */
 export const useEditorLocalImages = (params: {
@@ -14,6 +14,7 @@ export const useEditorLocalImages = (params: {
   editorRef: Ref<{ editor: Editor } | null>;
 }) => {
   const { activeTab, editorRef } = params;
+  const { notesDirectory } = useSettings();
 
   // 将 markdown 的相对路径 assets/xxx.png 解析为可在 Electron 中加载的 URL（dev 下不能直接用 file:///）
   const resolveLocalImageSrc = (src: string) => {
@@ -98,6 +99,7 @@ export const useEditorLocalImages = (params: {
 
       const result = await window.ipcRenderer.invoke('asset-write', {
         notePath: activeTab.value.path,
+        notesRoot: notesDirectory.value,
         fileName,
         data: new Uint8Array(arrayBuffer),
       });
@@ -147,6 +149,7 @@ export const useEditorLocalImages = (params: {
 
       const result = await window.ipcRenderer.invoke('asset-write', {
         notePath: activeTab.value.path,
+        notesRoot: notesDirectory.value,
         fileName,
         data: new Uint8Array(arrayBuffer),
       });

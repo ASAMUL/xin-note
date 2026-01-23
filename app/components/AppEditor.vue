@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/vue-3';
 import type { EditorCustomHandlers, EditorSuggestionMenuItem, EditorToolbarItem } from '@nuxt/ui';
-import { Emoji, gitHubEmojis } from '@tiptap/extension-emoji';
+import { gitHubEmojis } from '@tiptap/extension-emoji';
 
 import { LocalImageResolver } from '~/components/editor/EditorLocalImageResolverExtension';
+import { LuminaEmoji } from '~/components/editor/EditorEmojiExtension';
 
 // 编辑器引用
 const editorRef = useTemplateRef<{ editor: Editor }>('editorRef');
@@ -108,7 +109,7 @@ const emojiItems = computed(() => {
 
 const editorExtensions = computed(() => {
   return [
-    Emoji,
+    LuminaEmoji,
     LocalImageResolver.configure({
       resolve: resolveLocalImageSrc,
     }),

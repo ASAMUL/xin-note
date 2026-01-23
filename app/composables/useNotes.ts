@@ -242,12 +242,30 @@ export function useNotes() {
     if (!window.ipcRenderer) return false;
 
     try {
+      const oldPath = note.path;
       const newPath = await window.ipcRenderer.invoke('file-move', {
-        sourcePath: note.path,
+        sourcePath: oldPath,
         targetDir: targetFolderPath,
       });
 
       if (newPath) {
+        // 同步更新已打开的标签页路径（否则自动保存会写到旧路径）
+        const { renameTabByPath, renameTabsByFolder } = useTabs();
+        if (note.isFolder) {
+          await renameTabsByFolder(oldPath, newPath);
+        } else {
+          const name = newPath.replace(/\\/g, '/').split('/').pop() || note.name;
+          await renameTabByPath(oldPath, newPath, name);
+        }
+
+        // 兼容旧逻辑：如果某处仍使用 activeNote，则同步更新（按 path 判断更稳）
+        if (state.value.activeNote && state.value.activeNote.path === oldPath) {
+          state.value.activeNote.path = newPath;
+          if (!note.isFolder) {
+            state.value.activeNote.name = newPath.replace(/\\/g, '/').split('/').pop() || state.value.activeNote.name;
+          }
+        }
+
         // 刷新笔记列表
         await loadNotes();
         return true;

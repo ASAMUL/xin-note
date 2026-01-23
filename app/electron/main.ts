@@ -44,6 +44,9 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
 let win: BrowserWindow | null;
 
 function registerAssetProtocol() {
+  // 兜底解析缓存：key = 请求的 absPath，value = 找到的替代路径（或 null 表示找不到）
+  const fallbackCache = new Map<string, string | null>();
+
   // 允许通过 <img src="lumina-asset://local/<encodedAbsPath>"> 加载本地图片
   // - encodedAbsPath = encodeURIComponent('C:/.../assets/xxx.png')
   protocol.registerFileProtocol('lumina-asset', (request, callback) => {
@@ -73,6 +76,61 @@ function registerAssetProtocol() {
       if (!/(^|[\\/])assets[\\/]/i.test(filePath)) {
         console.warn('[lumina-asset] blocked path:', filePath);
         return callback({ error: -10 }); // net::ERR_ACCESS_DENIED
+      }
+
+      // 兼容历史问题：
+      // - 笔记文件被移动到子目录后，markdown 仍引用 `assets/<file>`，但旧实现只移动了 `.md` 没同步资源；
+      // - 导致新目录 `.../assets/<file>` 不存在，图片加载失败。
+      // 这里做一个“查找同名 assets 文件”的兜底：
+      // - 优先命中同目录 assets（正常情况）
+      // - 其次命中祖先目录 assets（例如从根目录拖入子目录）
+      // - 再次尝试同一父目录下的兄弟目录 assets（例如在兄弟文件夹之间移动）
+      if (!existsSync(filePath)) {
+        const cached = fallbackCache.get(filePath);
+        if (cached !== undefined) {
+          if (cached) filePath = cached;
+        } else {
+          const fileName = path.basename(filePath);
+          let resolved: string | null = null;
+
+          // 1) 祖先目录：<ancestor>/assets/<fileName>
+          // filePath 通常是：<noteDir>/assets/<fileName>
+          let cur = path.dirname(path.dirname(filePath));
+          while (cur && cur !== path.dirname(cur)) {
+            const candidate = path.join(cur, 'assets', fileName);
+            if (existsSync(candidate)) {
+              resolved = candidate;
+              break;
+            }
+            cur = path.dirname(cur);
+          }
+
+          // 2) 兄弟目录：<parent>/<sibling>/assets/<fileName>
+          if (!resolved) {
+            const noteDir = path.dirname(path.dirname(filePath));
+            const parentDir = path.dirname(noteDir);
+            if (parentDir && parentDir !== noteDir && existsSync(parentDir)) {
+              try {
+                const entries = readdirSync(parentDir, { withFileTypes: true });
+                for (const ent of entries) {
+                  if (!ent.isDirectory()) continue;
+                  if (ent.name.toLowerCase() === 'assets') continue;
+
+                  const candidate = path.join(parentDir, ent.name, 'assets', fileName);
+                  if (existsSync(candidate)) {
+                    resolved = candidate;
+                    break;
+                  }
+                }
+              } catch (e) {
+                // 忽略兜底扫描错误，保持原行为（加载失败即可）
+              }
+            }
+          }
+
+          fallbackCache.set(filePath, resolved);
+          if (resolved) filePath = resolved;
+        }
       }
 
       return callback({ path: filePath });
@@ -288,12 +346,21 @@ function initIpc() {
       {
         notePath,
         fileName,
+        notesRoot,
         data,
-      }: { notePath: string; fileName: string; data: ArrayBuffer | Uint8Array | number[] },
+      }: {
+        notePath: string;
+        fileName: string;
+        notesRoot?: string | null;
+        data: ArrayBuffer | Uint8Array | number[];
+      },
     ) => {
       try {
-        const noteDir = path.dirname(notePath);
-        const assetsDir = path.join(noteDir, 'assets');
+        // 资源目录策略：优先使用“笔记根目录（notesDirectory）/assets”
+        // - 这样笔记移动到子目录/兄弟目录后，不需要复制 assets
+        // - markdown 仍然保持 `assets/<fileName>` 这种稳定引用
+        const baseDir = notesRoot || path.dirname(notePath);
+        const assetsDir = path.join(baseDir, 'assets');
         await fs.mkdir(assetsDir, { recursive: true });
 
         const absPath = path.join(assetsDir, fileName);
@@ -440,6 +507,7 @@ function initIpc() {
         }
 
         await fs.rename(sourcePath, newPath);
+
         return newPath;
       } catch (error) {
         console.error('移动文件失败:', error);
