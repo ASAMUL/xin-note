@@ -181,7 +181,7 @@ const editorExtensions = computed(() => {
 
             <UEditorSuggestionMenu :editor="editor" :items="suggestionItems" />
             <UEditorEmojiMenu :editor="editor" :items="emojiItems" />
-
+            
             <!-- AI 候选下拉（第 1 条在 ghost，其余在下拉） -->
             <div
               v-if="aiState.visible && aiState.suggestions.length > 1"

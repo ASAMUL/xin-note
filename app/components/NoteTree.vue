@@ -31,6 +31,9 @@ const emit = defineEmits<{
 // 本地可编辑的列表（用于拖拽）
 const localItems = ref<NoteItem[]>([]);
 
+// 根容器（用于定位并滚动到激活项）
+const treeContainerRef = ref<HTMLElement | null>(null);
+
 // 同步 props.items 到 localItems
 watch(
   () => props.items,
@@ -49,6 +52,15 @@ const dragOverFolderPath = useState<string | null>('note-tree-dragover', () => n
 // 当前正在拖拽的项目（全局共享）
 const currentDraggingItem = useState<NoteItem | null>('note-tree-dragging', () => null);
 
+// 路径比较：兼容 Windows 下 \ / 和大小写差异
+const normalizePathForCompare = (p: string) => p.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
+
+// 当前项是否为激活文件（用于高亮）
+const isActive = (notePath: string) => {
+  if (!props.activeTabPath) return false;
+  return normalizePathForCompare(notePath) === normalizePathForCompare(props.activeTabPath);
+};
+
 // 切换文件夹展开状态
 const toggleExpand = (note: NoteItem, event?: MouseEvent) => {
   if (!note.isFolder) return;
@@ -65,6 +77,96 @@ const toggleExpand = (note: NoteItem, event?: MouseEvent) => {
 const isExpanded = (note: NoteItem) => {
   return note.isFolder && expandedFolders.value.has(note.path);
 };
+
+/**
+ * 根据当前树结构递归查找：激活文件所在的“父文件夹链路”
+ * 返回值示例：['F:\\notes\\A', 'F:\\notes\\A\\B']
+ */
+const findFolderChainByActivePath = (
+  items: NoteItem[],
+  activeNorm: string,
+  parents: string[] = [],
+): string[] | null => {
+  for (const item of items) {
+    const itemNorm = normalizePathForCompare(item.path);
+    if (itemNorm === activeNorm) {
+      return parents;
+    }
+    if (item.isFolder && item.children && item.children.length > 0) {
+      const res = findFolderChainByActivePath(item.children, activeNorm, [...parents, item.path]);
+      if (res) return res;
+    }
+  }
+  return null;
+};
+
+/**
+ * 兜底：直接根据路径字符串逐级回溯父目录
+ * 注意：该函数不会验证父目录是否真实存在于当前树结构中。
+ */
+const collectParentPaths = (filePath: string): string[] => {
+  const res: string[] = [];
+  let cur = getParentPath(filePath);
+  while (cur) {
+    res.push(cur);
+    // Windows 盘符根（如 F:）到此为止
+    if (/^[a-zA-Z]:$/.test(cur)) break;
+    const next = getParentPath(cur);
+    if (!next || next === cur) break;
+    cur = next;
+  }
+  return res.reverse();
+};
+
+/**
+ * 自动在目录树中“揭示”激活文件：
+ * - 展开其父文件夹链路（即使之前未展开）
+ * - 将激活项滚动到可视区域（仅根组件执行一次）
+ */
+const revealActiveInTree = async (activePath: string) => {
+  if (!activePath) return;
+
+  // 1) 优先用当前树结构精确计算父文件夹链路（确保加入 Set 的路径格式与 NoteItem.path 一致）
+  const activeNorm = normalizePathForCompare(activePath);
+  const folderChain = findFolderChainByActivePath(props.items, activeNorm);
+
+  if (folderChain && folderChain.length > 0) {
+    for (const folderPath of folderChain) expandedFolders.value.add(folderPath);
+  } else {
+    // 2) 兜底：无法在树中找到激活项时，按字符串父路径逐级展开（尽力而为）
+    for (const folderPath of collectParentPaths(activePath)) expandedFolders.value.add(folderPath);
+  }
+
+  // 等待 DOM 更新（包含递归子树渲染）
+  await nextTick();
+
+  // 仅根组件负责滚动定位，避免递归组件重复滚动
+  if (props.depth !== 0) return;
+  const activeEl = treeContainerRef.value?.querySelector<HTMLElement>('.note-tree-item--active');
+  activeEl?.scrollIntoView({ block: 'nearest' });
+};
+
+// 仅在根组件监听：切换标签页时自动展开父文件夹并定位
+watch(
+  () => props.activeTabPath,
+  (p) => {
+    if (props.depth !== 0) return;
+    if (!p) return;
+    void revealActiveInTree(p);
+  },
+  { immediate: true },
+);
+
+// 笔记树数据刷新后（例如移动/重命名/启动加载），再尝试揭示一次激活文件
+watch(
+  () => props.items,
+  () => {
+    if (props.depth !== 0) return;
+    if (!props.activeTabPath) return;
+    void revealActiveInTree(props.activeTabPath);
+  },
+  { immediate: true },
+);
 
 // 处理项目点击
 const handleItemClick = (note: NoteItem) => {
@@ -124,11 +226,11 @@ const onListChange = (evt: any) => {
   }
 };
 
-// 获取文件的父目录路径
-const getParentPath = (filePath: string): string => {
+// 获取文件的父目录路径（用 function 声明，避免被 immediate watch 提前调用时触发 TDZ）
+function getParentPath(filePath: string): string {
   const separatorIndex = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
   return separatorIndex > 0 ? filePath.substring(0, separatorIndex) : '';
-};
+}
 
 // 计算缩进样式
 const getIndentStyle = (extraDepth: number = 0) => ({
@@ -220,95 +322,99 @@ const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
 </script>
 
 <template>
-  <draggable
-    v-model="localItems"
-    v-bind="dragOptions"
-    item-key="id"
-    tag="div"
-    class="note-tree-list"
-    @start="onDragStart"
-    @end="onDragEnd"
-    @change="onListChange"
-  >
-    <!-- 每个 item 只有一个根元素 -->
-    <template #item="{ element }">
-      <div class="note-tree-item-wrapper">
-        <!-- 笔记项 / 文件夹项 -->
-        <!-- 未展开的文件夹添加原生拖放事件，允许直接拖入 -->
-        <div
-          class="note-tree-item"
-          :class="{
-            'note-tree-item--active': activeTabPath === element.path,
-            'note-tree-item--folder': element.isFolder,
-            'note-tree-item--drag-over':
-              element.isFolder && !isExpanded(element) && dragOverFolderPath === element.path,
-          }"
-          :style="getIndentStyle()"
-          @click="handleItemClick(element)"
-          @contextmenu="(e) => handleContextMenu(e, element)"
-          @dragenter="
-            element.isFolder && !isExpanded(element)
-              ? handleFolderDragEnter($event, element)
-              : undefined
-          "
-          @dragover="
-            element.isFolder && !isExpanded(element)
-              ? handleFolderDragOver($event, element)
-              : undefined
-          "
-          @dragleave="
-            element.isFolder && !isExpanded(element)
-              ? handleFolderDragLeave($event, element)
-              : undefined
-          "
-          @drop="
-            element.isFolder && !isExpanded(element) ? handleFolderDrop($event, element) : undefined
-          "
-        >
-          <!-- 展开/折叠箭头 -->
-          <UIcon
-            v-if="element.isFolder"
-            :name="isExpanded(element) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-            class="note-tree-arrow"
-            @click.stop="toggleExpand(element)"
-          />
-          <span v-else class="note-tree-arrow-placeholder" />
+  <div ref="treeContainerRef">
+    <draggable
+      v-model="localItems"
+      v-bind="dragOptions"
+      item-key="id"
+      tag="div"
+      class="note-tree-list"
+      @start="onDragStart"
+      @end="onDragEnd"
+      @change="onListChange"
+    >
+      <!-- 每个 item 只有一个根元素 -->
+      <template #item="{ element }">
+        <div class="note-tree-item-wrapper">
+          <!-- 笔记项 / 文件夹项 -->
+          <!-- 未展开的文件夹添加原生拖放事件，允许直接拖入 -->
+          <div
+            class="note-tree-item"
+            :class="{
+              'note-tree-item--active': isActive(element.path),
+              'note-tree-item--folder': element.isFolder,
+              'note-tree-item--drag-over':
+                element.isFolder && !isExpanded(element) && dragOverFolderPath === element.path,
+            }"
+            :style="getIndentStyle()"
+            @click="handleItemClick(element)"
+            @contextmenu="(e) => handleContextMenu(e, element)"
+            @dragenter="
+              element.isFolder && !isExpanded(element)
+                ? handleFolderDragEnter($event, element)
+                : undefined
+            "
+            @dragover="
+              element.isFolder && !isExpanded(element)
+                ? handleFolderDragOver($event, element)
+                : undefined
+            "
+            @dragleave="
+              element.isFolder && !isExpanded(element)
+                ? handleFolderDragLeave($event, element)
+                : undefined
+            "
+            @drop="
+              element.isFolder && !isExpanded(element)
+                ? handleFolderDrop($event, element)
+                : undefined
+            "
+          >
+            <!-- 展开/折叠箭头 -->
+            <UIcon
+              v-if="element.isFolder"
+              :name="isExpanded(element) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+              class="note-tree-arrow"
+              @click.stop="toggleExpand(element)"
+            />
+            <span v-else class="note-tree-arrow-placeholder" />
 
-          <!-- 图标 -->
-          <UIcon
-            :name="element.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text'"
-            class="note-tree-icon"
-            :class="{ 'note-tree-icon--folder': element.isFolder }"
-          />
+            <!-- 图标 -->
+            <UIcon
+              :name="element.isFolder ? 'i-lucide-folder' : 'i-lucide-file-text'"
+              class="note-tree-icon"
+              :class="{ 'note-tree-icon--folder': element.isFolder }"
+            />
 
-          <!-- 名称 -->
-          <span class="note-tree-label">
-            {{ element.name.replace('.md', '') }}
-          </span>
+            <!-- 名称 -->
+            <span class="note-tree-label">
+              {{ element.name.replace('.md', '') }}
+            </span>
 
-          <!-- 拖放提示图标 - 仅在拖拽悬停时显示 -->
-          <UIcon
-            v-if="element.isFolder && !isExpanded(element) && dragOverFolderPath === element.path"
-            name="i-lucide-arrow-down-to-line"
-            class="note-tree-drop-hint"
-          />
+            <!-- 拖放提示图标 - 仅在拖拽悬停时显示 -->
+            <UIcon
+              v-if="element.isFolder && !isExpanded(element) && dragOverFolderPath === element.path"
+              name="i-lucide-arrow-down-to-line"
+              class="note-tree-drop-hint"
+            />
+          </div>
+
+          <!-- 文件夹展开时的子项 -->
+          <div v-if="element.isFolder && isExpanded(element)" class="note-tree-children">
+            <NoteTree
+              :items="element.children || []"
+              :active-tab-path="activeTabPath"
+              :depth="depth + 1"
+              :parent-folder-path="element.path"
+              @select="(note) => emit('select', note)"
+              @contextmenu="(e, note) => emit('contextmenu', e, note)"
+              @move="(note, folder) => emit('move', note, folder)"
+            />
+          </div>
         </div>
-
-        <!-- 文件夹展开时的子项 -->
-        <div v-if="element.isFolder && isExpanded(element)" class="note-tree-children">
-          <NoteTree
-            :items="element.children || []"
-            :active-tab-path="activeTabPath"
-            :depth="depth + 1"
-            :parent-folder-path="element.path"
-            @select="(note) => emit('select', note)"
-            @contextmenu="(e, note) => emit('contextmenu', e, note)"
-            @move="(note, folder) => emit('move', note, folder)"
-          />
-        </div>
-      </div>
-    </template>
-  </draggable>
+      </template>
+    </draggable>
+  </div>
 </template>
 
 <style scoped>
