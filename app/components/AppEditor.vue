@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import type { Editor } from '@tiptap/vue-3';
-import type { EditorCustomHandlers, EditorSuggestionMenuItem, EditorToolbarItem } from '@nuxt/ui';
+import type { EditorCustomHandlers } from '#ui/types/editor';
+import type { EditorSuggestionMenuItem } from '#ui/components/EditorSuggestionMenu.vue';
+import type { EditorToolbarItem } from '#ui/components/EditorToolbar.vue';
 import { gitHubEmojis } from '@tiptap/extension-emoji';
+import type { Editor } from '@tiptap/vue-3';
 
 import { LocalImageResolver } from '~/components/editor/EditorLocalImageResolverExtension';
 import { LuminaEmoji } from '~/components/editor/EditorEmojiExtension';
+import { useEditorAiCompletion } from '~/composables/editor/useEditorAiCompletion';
+import { useEditorDragHandleMenu } from '~/composables/editor/useEditorDragHandleMenu';
+import { useEditorLocalImages } from '~/composables/editor/useEditorLocalImages';
 
 // 编辑器引用
 const editorRef = useTemplateRef<{ editor: Editor }>('editorRef');
@@ -15,8 +20,7 @@ const { activeTab, editorContent, saveStatus, saveStatusInfo } = useEditorAutoSa
 
 defineShortcuts({
   meta_y: () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editorRef.value?.editor as any)?.chain().focus().redo().run();
+    editorRef.value?.editor?.chain().focus().redo().run();
   },
 });
 // 本地图片（上传/粘贴 + src 解析）
@@ -116,7 +120,6 @@ const editorExtensions = computed(() => {
     aiCompletionExtension.value,
   ] as any;
 });
-
 </script>
 
 <template>
@@ -166,7 +169,6 @@ const editorExtensions = computed(() => {
                 :items="dragHandleMenuItems(editor)"
                 :content="{ side: 'left' }"
                 :ui="{ content: 'w-56', label: 'text-xs' }"
-                @update:open="editor.chain().setMeta('lockDragHandle', $event).run()"
               >
                 <UButton
                   color="neutral"
@@ -182,7 +184,7 @@ const editorExtensions = computed(() => {
 
             <UEditorSuggestionMenu :editor="editor" :items="suggestionItems" />
             <UEditorEmojiMenu :editor="editor" :items="emojiItems" />
-            
+
             <!-- AI 候选下拉（第 1 条在 ghost，其余在下拉） -->
             <div
               v-if="aiState.visible && aiState.suggestions.length > 1"

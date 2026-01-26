@@ -1,0 +1,124 @@
+/* ========================================
+   Tiptap 编辑器样式 
+   ======================================== */
+
+.tiptap {
+  outline: none;
+  caret-color: var(--accent-color);
+
+  line-height: 1.5;
+}
+
+/* --- P 标签*/
+.tiptap p {
+  margin-top: 0;
+  margin-bottom: 0.25em;
+  min-height: 1.5em;
+}
+
+/* --- H 标签 */
+.tiptap h1,
+.tiptap h2,
+.tiptap h3 {
+  color: var(--text-main);
+  font-weight: 600;
+  line-height: 1.3;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  margin-top: 1.8em;
+  margin-bottom: 0.25em;
+}
+
+.tiptap > *:first-child {
+  margin-top: 0 !important;
+}
+
+.tiptap h1 {
+  font-size: 1.875em;
+}
+.tiptap h2 {
+  font-size: 1.5em;
+}
+.tiptap h3 {
+  font-size: 1.25em;
+}
+
+/* --- 引用块 --- */
+.tiptap blockquote {
+  border-left: 3px solid var(--text-main);
+  padding-left: 1em;
+  margin-left: 0;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  color: var(--text-mute);
+  font-style: normal;
+  opacity: 0.8;
+}
+
+/* --- 行内代码 --- */
+.tiptap code {
+  color: var(--accent-color);
+  background-color: var(--highlight-bg);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', monospace;
+}
+
+/* --- 代码块 --- */
+.tiptap pre {
+  background-color: var(--bg-sidebar);
+  padding: 1.5em;
+  border-radius: 4px;
+  margin: 0.5em 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', monospace;
+}
+
+.tiptap pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 0.9em;
+}
+
+/* --- 列表 --- */
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.25em 0;
+}
+
+.tiptap li {
+  margin: 0.1em 0;
+}
+
+/* --- 链接 --- */
+.tiptap a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--accent-color);
+  text-underline-offset: 2px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.tiptap a:hover {
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+.tiptap ::selection {
+  background-color: var(--highlight-bg);
+}
+
+.prose {
+  max-width: none;
+}
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre {
+  margin-top: 0;
+  margin-bottom: 0.25em;
+}

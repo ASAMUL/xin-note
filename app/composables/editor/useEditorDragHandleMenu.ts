@@ -1,14 +1,14 @@
 import type { Ref } from 'vue';
+import type { DropdownMenuItem } from '#ui/components/DropdownMenu.vue';
+import type { EditorCustomHandlers } from '#ui/types/editor';
 import type { Editor } from '@tiptap/vue-3';
-import type { DropdownMenuItem, EditorCustomHandlers } from '@nuxt/ui';
+import { mapEditorItems } from '#ui/utils/editor';
 
-import { mapEditorItems } from '@nuxt/ui/utils/editor';
-
-import { upperFirst } from '~/utils/string';
+import { upperFirst } from 'scule';
 
 /**
- * Nuxt UI Editor DragHandle 的右键菜单（基于当前选中的节点）
- * - 通过 mapEditorItems 复用 Nuxt UI 内置行为（自动绑定 handler）
+ * Nuxt UI Editor DragHandle 的菜单
+ * -
  */
 export const useEditorDragHandleMenu = (customHandlers: Ref<EditorCustomHandlers>) => {
   const selectedNode = ref<{ node: any; pos: number }>();
@@ -49,6 +49,15 @@ export const useEditorDragHandleMenu = (customHandlers: Ref<EditorCustomHandlers
             pos: selectedNode.value.pos,
             label: '复制块',
             icon: 'i-lucide-copy',
+            onSelect: async () => {
+              if (!selectedNode.value) return;
+
+              const pos = selectedNode.value.pos;
+              const node = editor.state.doc.nodeAt(pos);
+              if (node) {
+                await navigator.clipboard.writeText(node.textContent);
+              }
+            },
           },
           {
             kind: 'moveUp',
@@ -81,4 +90,3 @@ export const useEditorDragHandleMenu = (customHandlers: Ref<EditorCustomHandlers
     dragHandleMenuItems,
   };
 };
-

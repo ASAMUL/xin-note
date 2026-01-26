@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
+import type { DropdownMenuItem } from '#ui/components/DropdownMenu.vue';
+import type { EditorCustomHandlers } from '#ui/types/editor';
 import type { Editor } from '@tiptap/vue-3';
-import type { DropdownMenuItem, EditorCustomHandlers } from '@nuxt/ui';
 
 import type { AiCompletionState } from '~/components/editor/EditorAiCompletionExtension';
 import { AiCompletion } from '~/components/editor/EditorAiCompletionExtension';
@@ -56,7 +57,8 @@ export const useEditorAiCompletion = (params: {
     return (editor.storage as any)?.aiCompletion as any;
   };
 
-  const requestAiSuggestions = async (_editor: Editor, textBefore: string): Promise<string[]> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const requestAiSuggestions = async (_editor: any, textBefore: string): Promise<string[]> => {
     const key = aiApiKey.value?.trim();
     if (!key) return [];
 
@@ -104,7 +106,8 @@ export const useEditorAiCompletion = (params: {
     }
   };
 
-  const triggerAiSuggest = async (editor: Editor) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const triggerAiSuggest = async (editor: any) => {
     const key = aiApiKey.value?.trim();
     if (!key) return;
     if (aiLoading.value) return;
@@ -215,18 +218,18 @@ export const useEditorAiCompletion = (params: {
   });
 
   const aiHandlers = computed(() => {
-    const handlers = {
+    const handlers: EditorCustomHandlers = {
       aiSuggest: {
-        canExecute: (editor: Editor) => !!aiApiKey.value && !aiLoading.value && editor.state.selection.empty,
-        execute: (editor: Editor) => {
+        canExecute: (editor, _cmd) =>
+          !!aiApiKey.value && !aiLoading.value && editor.state.selection.empty,
+        execute: (editor, _cmd) => {
           triggerAiSuggest(editor);
           return (editor as any).chain();
         },
-        isActive: (editor: Editor) => !!getAiStorage(editor)?.visible,
-        isDisabled: (editor: Editor) =>
-          !aiApiKey.value || aiLoading.value || !editor.state.selection.empty,
+        isActive: (editor, _cmd) => !!getAiStorage(editor)?.visible,
+        isDisabled: (editor, _cmd) => !aiApiKey.value || aiLoading.value || !editor.state.selection.empty,
       },
-    } satisfies EditorCustomHandlers;
+    };
 
     return handlers;
   });

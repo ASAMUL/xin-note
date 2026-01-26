@@ -1,6 +1,7 @@
 @import '@nuxt/ui';
 @import 'tailwindcss';
 @import './transition.css';
+@import './note.css';
 
 /* ========================================
    主题颜色系统 - 暖调护眼 (羊皮纸/书房风格)
@@ -17,7 +18,7 @@
   --border-color: #d6d3c9;
 
   /* 文字色系 */
-  --text-main: #332f2c; /* 文字：墨色 */
+  --text-main: #000000; /* 文字：墨色 */
   --text-mute: #857f78; /* 弱化文字 */
 
   /* 强调色 */
@@ -142,117 +143,14 @@
 body {
   background-color: var(--bg-app);
   color: var(--text-main);
+  /* 开启字体平滑，让 Inter 看起来更细致 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 @theme {
-  --font-sans: 'JetBrains Mono', 'sans-serif';
+  --font-sans: 'LXGW WenKai TC';
 }
 
-/* ========================================
-   Tiptap 编辑器样式
-   ======================================== */
-
-.tiptap {
-  outline: none;
-  caret-color: var(--accent-color);
-}
-
-.tiptap p {
-  margin: 0.75em 0;
-  line-height: 1.75;
-}
-
-.tiptap h1,
-.tiptap h2,
-.tiptap h3 {
-  color: var(--text-main);
-  font-weight: 600;
-  line-height: 1.3;
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-}
-
-.tiptap h1 {
-  font-size: 2em;
-}
-.tiptap h2 {
-  font-size: 1.5em;
-}
-.tiptap h3 {
-  font-size: 1.25em;
-}
-
-.tiptap blockquote {
-  border-left: 3px solid var(--color-primary-300);
-  padding-left: 1em;
-  margin-left: 0;
-  color: var(--text-mute);
-  font-style: italic;
-}
-
-.tiptap code {
-  background-color: var(--highlight-bg);
-  padding: 0.2em 0.4em;
-  border-radius: 0.25em;
-  font-size: 0.875em;
-}
-
-.tiptap pre {
-  background-color: var(--bg-sidebar);
-  padding: 1em;
-  border-radius: 0.5em;
-  overflow-x: auto;
-}
-
-.tiptap pre code {
-  background: none;
-  padding: 0;
-}
-
-.tiptap ul,
-.tiptap ol {
-  padding-left: 1.5em;
-  margin: 0.75em 0;
-}
-
-.tiptap li {
-  margin: 0.25em 0;
-}
-
-.tiptap a {
-  color: var(--accent-color);
-  text-decoration: underline;
-}
-
-.tiptap a:hover {
-  color: var(--accent-hover);
-}
-
-.tiptap ::selection {
-  background-color: var(--highlight-bg);
-}
-
-/* Prose 样式覆盖 - 让 prose 使用主题色 */
-.prose {
-  --tw-prose-body: var(--text-main);
-  --tw-prose-headings: var(--text-main);
-  --tw-prose-links: var(--accent-color);
-  --tw-prose-bold: var(--text-main);
-  --tw-prose-quotes: var(--text-mute);
-  --tw-prose-quote-borders: var(--accent-color);
-  --tw-prose-code: var(--text-main);
-  --tw-prose-pre-bg: var(--bg-sidebar);
-}
-
-.dark .prose {
-  --tw-prose-invert-body: var(--text-main);
-  --tw-prose-invert-headings: var(--text-main);
-  --tw-prose-invert-links: var(--accent-color);
-  --tw-prose-invert-bold: var(--text-main);
-  --tw-prose-invert-quotes: var(--text-mute);
-  --tw-prose-invert-quote-borders: var(--accent-color);
-  --tw-prose-invert-code: var(--text-main);
-  --tw-prose-invert-pre-bg: var(--bg-sidebar);
-}
 /* ========================================
    全局滚动条样式
    ======================================== */

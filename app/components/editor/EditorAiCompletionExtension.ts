@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import type { Editor } from '@tiptap/core'
+import type { Editor } from '@tiptap/vue-3'
 
 export interface AiCompletionState {
   visible: boolean

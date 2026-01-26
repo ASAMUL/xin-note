@@ -1,7 +1,6 @@
 import type { Ref } from 'vue';
+import type { EditorCustomHandlers } from '#ui/types/editor';
 import type { Editor } from '@tiptap/vue-3';
-import type { EditorCustomHandlers } from '@nuxt/ui';
-
 import type { TabItem } from '~/composables/useTabs';
 
 /**
@@ -87,7 +86,8 @@ export const useEditorLocalImages = (params: {
     });
   };
 
-  const insertLocalImageToNote = async (editor: Editor, file: File) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertLocalImageToNote = async (editor: any, file: File) => {
     if (!activeTab.value?.path) return;
     if (typeof window === 'undefined' || !window.ipcRenderer) return;
 
@@ -172,11 +172,11 @@ export const useEditorLocalImages = (params: {
   };
 
   const imageHandlers = computed(() => {
-    const handlers = {
+    const handlers: EditorCustomHandlers = {
       imageUpload: {
-        canExecute: (editor: Editor) =>
+        canExecute: (editor, _cmd) =>
           !!activeTab.value?.path && typeof window !== 'undefined' && !!window.ipcRenderer && editor.isEditable,
-        execute: (editor: Editor) => {
+        execute: (editor, _cmd) => {
           // 通过文件选择对话框上传图片并写入当前笔记 assets/，插入 markdown 相对路径
           void (async () => {
             const file = await pickImageFile('image/*');
@@ -189,9 +189,8 @@ export const useEditorLocalImages = (params: {
         },
         // 这是一个“动作按钮”，不需要 active 态（避免选中图片时误高亮）
         isActive: () => false,
-        isDisabled: undefined,
       },
-    } satisfies EditorCustomHandlers;
+    };
 
     return handlers;
   });
