@@ -57,7 +57,7 @@
 /* --- 行内代码 --- */
 .tiptap code {
   color: var(--accent-color);
-  background-color: var(--highlight-bg);
+  background-color: var(--bg-paper);
   padding: 0.2em 0.4em;
   border-radius: 3px;
   font-size: 0.85em;

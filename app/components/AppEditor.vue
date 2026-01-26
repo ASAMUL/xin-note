@@ -10,6 +10,7 @@ import { LuminaEmoji } from '~/components/editor/EditorEmojiExtension';
 import { useEditorAiCompletion } from '~/composables/editor/useEditorAiCompletion';
 import { useEditorDragHandleMenu } from '~/composables/editor/useEditorDragHandleMenu';
 import { useEditorLocalImages } from '~/composables/editor/useEditorLocalImages';
+import { useEditorToolBar } from '~/composables/editor/useEditorToolBar';
 
 // 编辑器引用
 const editorRef = useTemplateRef<{ editor: Editor }>('editorRef');
@@ -55,32 +56,7 @@ const customHandlers = computed(() => {
 
 // Drag handle 右键菜单：复用 Nuxt UI 的 mapEditorItems，自动绑定 handler
 const { selectedNode, dragHandleMenuItems } = useEditorDragHandleMenu(customHandlers);
-
-const toolbarItems = computed(() => {
-  return [
-    [
-      { kind: 'undo', icon: 'i-lucide-undo', tooltip: { text: '撤销' } },
-      { kind: 'redo', icon: 'i-lucide-redo', tooltip: { text: '重做' } },
-    ],
-    [
-      {
-        kind: 'aiSuggest',
-        icon: 'i-lucide-sparkles',
-        tooltip: { text: aiApiKey.value ? 'AI 续写（Tab）' : '请先在设置中填写 API Key' },
-        loading: aiLoading.value,
-        disabled: !aiApiKey.value,
-      },
-    ],
-    [
-      { kind: 'mark', mark: 'bold', icon: 'i-lucide-bold', tooltip: { text: '加粗' } },
-      { kind: 'mark', mark: 'italic', icon: 'i-lucide-italic', tooltip: { text: '斜体' } },
-      { kind: 'mark', mark: 'underline', icon: 'i-lucide-underline', tooltip: { text: '下划线' } },
-      { kind: 'mark', mark: 'strike', icon: 'i-lucide-strikethrough', tooltip: { text: '删除线' } },
-      { kind: 'mark', mark: 'code', icon: 'i-lucide-code', tooltip: { text: '行内代码' } },
-    ],
-  ] satisfies EditorToolbarItem<typeof customHandlers.value>[][];
-});
-
+const { toolbarItems } = useEditorToolBar({ aiApiKey, aiLoading });
 const suggestionItems = computed(() => {
   return [
     [
@@ -152,11 +128,7 @@ const editorExtensions = computed(() => {
             :on-paste="(e) => handlePaste(e)"
             :on-selection-update="onSelectionUpdate"
           >
-            <UEditorToolbar
-              :editor="editor"
-              :items="toolbarItems"
-              class="border-b border-(--border-color) sticky top-0 inset-x-0 px-4 py-2 z-50 bg-(--bg-paper) overflow-x-auto"
-            />
+            <UEditorToolbar :editor="editor" :items="toolbarItems" layout="bubble" />
 
             <UEditorDragHandle
               v-slot="{ ui }"

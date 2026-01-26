@@ -43,6 +43,7 @@ const { createNote } = useNotes();
 // Tab 操作（用于保存快捷键）
 const { saveTab } = useTabs();
 
+const toast = useToast();
 // 全局快捷键注册（集中管理所有快捷键回调）
 useShortcuts({
   onOpenSettings: () => {
@@ -55,7 +56,15 @@ useShortcuts({
     createNote();
   },
   onSaveNote: () => {
-    saveTab();
+    saveTab().then((result) => {
+      console.log('saveTab result', result);
+      if (result) {
+        toast.add({
+          title: '已手动保存',
+          color: 'primary',
+        });
+      }
+    });
   },
 });
 
