@@ -193,6 +193,15 @@ function createWindow() {
     // 检测修饰键（Ctrl 或 Cmd）
     const isModKey = input.control || input.meta;
 
+    // F11 - 切换全屏
+    if (input.key === 'F11') {
+      event.preventDefault();
+      if (win) {
+        win.setFullScreen(!win.isFullScreen());
+      }
+      return;
+    }
+
     // Ctrl/Cmd + P - 打开搜索面板
     if (isModKey && input.key.toLowerCase() === 'p') {
       event.preventDefault();
@@ -231,6 +240,7 @@ function createWindow() {
 
 function initIpc() {
   ipcMain.handle('app-start-time', () => new Date().toLocaleString());
+  ipcMain.handle('app-get-version', () => app.getVersion());
 
   // 窗口控制
   ipcMain.on('window-minimize', () => {
@@ -243,6 +253,11 @@ function initIpc() {
     } else {
       win?.maximize();
     }
+  });
+
+  ipcMain.on('window-toggle-fullscreen', () => {
+    if (!win) return;
+    win.setFullScreen(!win.isFullScreen());
   });
 
   ipcMain.on('window-close', () => {
@@ -264,6 +279,34 @@ function initIpc() {
       title: '选择笔记存储目录',
     });
     return result.canceled ? null : result.filePaths[0];
+  });
+
+  // 选择 Markdown 文件（.md）
+  ipcMain.handle('dialog-open-md-file', async () => {
+    if (!win) return null;
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      title: '打开 Markdown 文件',
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  // ========== 编辑命令（作用于当前聚焦控件）==========
+  ipcMain.on('edit-undo', () => {
+    win?.webContents.undo();
+  });
+  ipcMain.on('edit-redo', () => {
+    win?.webContents.redo();
+  });
+  ipcMain.on('edit-cut', () => {
+    win?.webContents.cut();
+  });
+  ipcMain.on('edit-copy', () => {
+    win?.webContents.copy();
+  });
+  ipcMain.on('edit-paste', () => {
+    win?.webContents.paste();
   });
 
   // 读取目录内容

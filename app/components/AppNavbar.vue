@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import SaveAsDialog from '~/components/dialogs/SaveAsDialog.vue';
+import ShortcutsDialog from '~/components/dialogs/ShortcutsDialog.vue';
+import DocsDialog from '~/components/dialogs/DocsDialog.vue';
+import AboutDialog from '~/components/dialogs/AboutDialog.vue';
+
 // 设置
 const {
   notesDirectory,
@@ -11,6 +16,9 @@ const {
   setAiModel,
 } = useSettings();
 const showSettings = ref(false);
+
+// 布局（AI 侧边栏等）
+const { toggleAiSidebar, toggleLeftSidebar, toggleZenMode } = useLayoutState();
 
 // AI 设置（用草稿值编辑，点击保存后写入 settings.json）
 const aiKeyDraft = ref('');
@@ -38,12 +46,150 @@ const saveAiSettings = async () => {
 const searchOpen = ref(false);
 
 // 笔记操作
-const { createNote } = useNotes();
+const { createNote, loadNotes } = useNotes();
 
 // Tab 操作（用于保存快捷键）
-const { saveTab } = useTabs();
+const { saveTab, activeTab, openTabByPath } = useTabs();
 
 const toast = useToast();
+
+/**
+ * ========== 顶部菜单动作 ==========
+ */
+const handleCreateNoteFromMenu = async () => {
+  // 未设置笔记目录时，先提示选择目录
+  if (!notesDirectory.value) {
+    await selectNotesDirectory();
+  }
+  if (!notesDirectory.value) return;
+
+  // 默认在当前活动 tab 的目录创建（与 AppSidebar 行为一致）
+  let parentDir: string | undefined;
+  if (activeTab.value?.path) {
+    const p = activeTab.value.path;
+    parentDir = p.substring(0, Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/')));
+  }
+
+  await createNote('未命名笔记.md', parentDir);
+};
+
+const handleOpenWorkspaceFolder = async () => {
+  const folder = await selectNotesDirectory();
+  if (folder) {
+    toast.add({
+      title: '已打开笔记文件夹',
+      description: folder,
+      color: 'primary',
+    });
+  }
+};
+
+const handleOpenMarkdownFile = async () => {
+  if (!window.ipcRenderer) {
+    toast.add({ title: '当前环境不支持打开文件', color: 'error' });
+    return;
+  }
+  try {
+    const filePath = (await window.ipcRenderer.invoke('dialog-open-md-file')) as string | null;
+    if (!filePath) return;
+
+    const tab = await openTabByPath(filePath);
+    if (!tab) {
+      toast.add({ title: '打开文件失败', color: 'error' });
+      return;
+    }
+    toast.add({
+      title: '已打开文件',
+      description: tab.name,
+      color: 'primary',
+    });
+  } catch (error) {
+    console.error('打开文件失败:', error);
+    toast.add({ title: '打开文件失败', color: 'error' });
+  }
+};
+
+const handleSaveFromMenu = async () => {
+  if (!activeTab.value) {
+    toast.add({ title: '没有正在编辑的文件', color: 'neutral' });
+    return;
+  }
+  const ok = await saveTab();
+  toast.add({
+    title: ok ? '已手动保存' : '保存失败',
+    color: ok ? 'primary' : 'error',
+  });
+};
+
+const sendEditorCommand = (
+  channel: 'edit-undo' | 'edit-redo' | 'edit-cut' | 'edit-copy' | 'edit-paste',
+) => {
+  window.ipcRenderer?.send(channel);
+};
+
+// 另存为（复制当前文件）
+const showSaveAs = ref(false);
+const getParentDir = (p: string) =>
+  p.substring(0, Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/')));
+const saveAsDefaultDirectory = computed(() => {
+  const p = activeTab.value?.path;
+  if (p) return getParentDir(p);
+  return notesDirectory.value || '';
+});
+const saveAsDefaultFileName = computed(() => {
+  const base = activeTab.value?.name?.replace(/\.md$/i, '') || '未命名笔记';
+  return `${base} - 副本.md`;
+});
+
+const openSaveAsDialog = () => {
+  if (!activeTab.value) {
+    toast.add({ title: '没有正在编辑的文件', color: 'neutral' });
+    return;
+  }
+  showSaveAs.value = true;
+};
+
+const handleSaveAsConfirm = async (payload: { directory: string; fileName: string }) => {
+  if (!window.ipcRenderer) {
+    toast.add({ title: '当前环境不支持文件操作', color: 'error' });
+    return;
+  }
+  if (!activeTab.value) {
+    toast.add({ title: '没有正在编辑的文件', color: 'neutral' });
+    return;
+  }
+
+  try {
+    const newPath = (await window.ipcRenderer.invoke('file-create', {
+      directory: payload.directory,
+      fileName: payload.fileName,
+      content: activeTab.value.content || '',
+    })) as string | null;
+
+    if (!newPath) {
+      toast.add({ title: '创建副本失败', color: 'error' });
+      return;
+    }
+
+    // 刷新笔记树（若副本在当前工作区内，会立刻可见）
+    await loadNotes();
+
+    toast.add({
+      title: '已创建副本',
+      description: newPath,
+      color: 'primary',
+    });
+  } catch (error) {
+    console.error('另存为失败:', error);
+    toast.add({ title: '创建副本失败', color: 'error' });
+  }
+};
+
+// 帮助弹窗
+const showShortcuts = ref(false);
+const showDocs = ref(false);
+const showAbout = ref(false);
+
 // 全局快捷键注册（集中管理所有快捷键回调）
 useShortcuts({
   onOpenSettings: () => {
@@ -53,18 +199,10 @@ useShortcuts({
     searchOpen.value = true;
   },
   onCreateNote: () => {
-    createNote();
+    void handleCreateNoteFromMenu();
   },
   onSaveNote: () => {
-    saveTab().then((result) => {
-      console.log('saveTab result', result);
-      if (result) {
-        toast.add({
-          title: '已手动保存',
-          color: 'primary',
-        });
-      }
-    });
+    void handleSaveFromMenu();
   },
 });
 
@@ -136,44 +274,100 @@ const navItems = ref([
     label: '文件',
     icon: 'i-lucide-file',
     children: [
-      { label: '新建笔记', icon: 'i-lucide-file-plus' },
-      { label: '打开...', icon: 'i-lucide-folder-open' },
-      { type: 'separator' },
-      { label: '保存', icon: 'i-lucide-save', shortcut: 'Ctrl+S' },
-      { label: '另存为...', icon: 'i-lucide-save-all' },
+      { label: '新建笔记', icon: 'i-lucide-file-plus', onSelect: handleCreateNoteFromMenu },
+      { label: '打开文件夹...', icon: 'i-lucide-folder-open', onSelect: handleOpenWorkspaceFolder },
+      { label: '打开文件...', icon: 'i-lucide-file-text', onSelect: handleOpenMarkdownFile },
+      { label: '保存', icon: 'i-lucide-save', shortcut: 'Ctrl+S', onSelect: handleSaveFromMenu },
+      {
+        label: '另存为...',
+        icon: 'i-lucide-save-all',
+        onSelect: openSaveAsDialog,
+      },
     ],
   },
   {
     label: '编辑',
     icon: 'i-lucide-pencil',
     children: [
-      { label: '撤销', icon: 'i-lucide-undo', shortcut: 'Ctrl+Z' },
-      { label: '重做', icon: 'i-lucide-redo', shortcut: 'Ctrl+Y' },
-      { type: 'separator' },
-      { label: '剪切', icon: 'i-lucide-scissors', shortcut: 'Ctrl+X' },
-      { label: '复制', icon: 'i-lucide-copy', shortcut: 'Ctrl+C' },
-      { label: '粘贴', icon: 'i-lucide-clipboard', shortcut: 'Ctrl+V' },
+      {
+        label: '撤销',
+        icon: 'i-lucide-undo',
+        shortcut: 'Ctrl+Z',
+        onSelect: () => sendEditorCommand('edit-undo'),
+      },
+      {
+        label: '重做',
+        icon: 'i-lucide-redo',
+        shortcut: 'Ctrl+Y',
+        onSelect: () => sendEditorCommand('edit-redo'),
+      },
+      {
+        label: '剪切',
+        icon: 'i-lucide-scissors',
+        shortcut: 'Ctrl+X',
+        onSelect: () => sendEditorCommand('edit-cut'),
+      },
+      {
+        label: '复制',
+        icon: 'i-lucide-copy',
+        shortcut: 'Ctrl+C',
+        onSelect: () => sendEditorCommand('edit-copy'),
+      },
+      {
+        label: '粘贴',
+        icon: 'i-lucide-clipboard',
+        shortcut: 'Ctrl+V',
+        onSelect: () => sendEditorCommand('edit-paste'),
+      },
     ],
   },
   {
     label: '视图',
     icon: 'i-lucide-layout-grid',
     children: [
-      { label: '全屏', icon: 'i-lucide-maximize', shortcut: 'F11' },
-      { label: '禅模式', icon: 'i-lucide-focus' },
-      { type: 'separator' },
-      { label: '侧边栏', icon: 'i-lucide-panel-left' },
-      { label: 'AI 助手', icon: 'i-lucide-sparkles', shortcut: 'Ctrl+L' },
+      {
+        label: '全屏',
+        icon: 'i-lucide-maximize',
+        shortcut: 'F11',
+        onSelect: () => window.ipcRenderer?.send('window-toggle-fullscreen'),
+      },
+      {
+        label: '禅模式',
+        icon: 'i-lucide-focus',
+        onSelect: toggleZenMode,
+      },
+      {
+        label: '侧边栏',
+        icon: 'i-lucide-panel-left',
+        onSelect: toggleLeftSidebar,
+      },
+      {
+        label: 'AI 助手',
+        icon: 'i-lucide-sparkles',
+        shortcut: 'Ctrl+L',
+        onSelect: toggleAiSidebar,
+      },
     ],
   },
   {
     label: '帮助',
     icon: 'i-lucide-help-circle',
     children: [
-      { label: '快捷键', icon: 'i-lucide-keyboard' },
-      { label: '文档', icon: 'i-lucide-book-open' },
-      { type: 'separator' },
-      { label: '关于 Lumina', icon: 'i-lucide-info' },
+      {
+        label: '快捷键',
+        icon: 'i-lucide-keyboard',
+        onSelect: () => (showShortcuts.value = true),
+      },
+      {
+        label: '文档',
+        icon: 'i-lucide-book-open',
+        onSelect: () => (showDocs.value = true),
+      },
+      {
+        label: '关于 Lumina',
+        icon: 'i-lucide-info',
+        onSelect: () => (showAbout.value = true),
+      },
     ],
   },
 ]);
@@ -254,6 +448,19 @@ const navItems = ref([
 
     <!-- 搜索命令面板 -->
     <CommandPalette v-model:open="searchOpen" @open-settings="showSettings = true" />
+
+    <!-- 另存为弹窗（复制当前文件） -->
+    <SaveAsDialog
+      v-model:open="showSaveAs"
+      :default-directory="saveAsDefaultDirectory"
+      :default-file-name="saveAsDefaultFileName"
+      @confirm="handleSaveAsConfirm"
+    />
+
+    <!-- 帮助弹窗 -->
+    <ShortcutsDialog v-model:open="showShortcuts" />
+    <DocsDialog v-model:open="showDocs" />
+    <AboutDialog v-model:open="showAbout" />
 
     <!-- 关闭确认弹窗 -->
     <UModal v-model:open="showCloseConfirm">

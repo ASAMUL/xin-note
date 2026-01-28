@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { isAiSidebarOpen } = useLayoutState();
+const { isAiSidebarOpen, isLeftSidebarOpen, isZenMode } = useLayoutState();
 
 // 控制主内容区淡入
 const isAppReady = ref(false);
@@ -25,9 +25,11 @@ onNuxtReady(() => {
     <!-- Main Content Area -->
     <div class="flex-1 flex overflow-hidden">
       <!-- Left Sidebar -->
-      <aside class="w-64 flex-shrink-0">
-        <AppSidebar />
-      </aside>
+      <Transition name="slide-fade-left">
+        <aside v-if="isLeftSidebarOpen && !isZenMode" class="w-64 shrink-0">
+          <AppSidebar />
+        </aside>
+      </Transition>
 
       <!-- Center Content -->
       <main class="flex-1 min-w-0 flex flex-col relative z-0">
@@ -37,8 +39,8 @@ onNuxtReady(() => {
       <!-- Right Sidebar (AI) -->
       <Transition name="slide-fade-right">
         <aside
-          v-if="isAiSidebarOpen"
-          class="w-80 flex-shrink-0"
+          v-if="isAiSidebarOpen && !isZenMode"
+          class="w-80 shrink-0"
           style="border-left: 1px solid var(--border-color)"
         >
           <AiAssistant />
@@ -56,7 +58,8 @@ onNuxtReady(() => {
 .app-container {
   opacity: 0;
   transform: scale(0.98);
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+  transition:
+    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -66,6 +69,20 @@ onNuxtReady(() => {
 }
 
 /* AI 侧边栏滑入效果 */
+.slide-fade-left-enter-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-fade-left-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.slide-fade-left-enter-from,
+.slide-fade-left-leave-to {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
 .slide-fade-right-enter-active {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
