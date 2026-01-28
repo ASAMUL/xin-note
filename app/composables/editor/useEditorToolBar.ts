@@ -28,6 +28,16 @@ export const useEditorToolBar = ({
       { kind: 'mark', mark: 'strike', icon: 'i-lucide-strikethrough', tooltip: { text: '删除线' } },
       { kind: 'mark', mark: 'code', icon: 'i-lucide-code', tooltip: { text: '行内代码' } },
     ],
+    [
+      { kind: 'textAlign', align: 'left', icon: 'i-lucide-align-left' },
+      { kind: 'textAlign', align: 'center', icon: 'i-lucide-align-center' },
+      { kind: 'textAlign', align: 'right', icon: 'i-lucide-align-right' },
+      { kind: 'textAlign', align: 'justify', icon: 'i-lucide-align-justify' },
+    ],
+    [
+      { kind: 'bulletList', icon: 'i-lucide-list' },
+      { kind: 'orderedList', icon: 'i-lucide-list-ordered' },
+    ],
   ];
   return { toolbarItems };
 };

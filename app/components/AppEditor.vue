@@ -11,6 +11,8 @@ import { useEditorAiCompletion } from '~/composables/editor/useEditorAiCompletio
 import { useEditorDragHandleMenu } from '~/composables/editor/useEditorDragHandleMenu';
 import { useEditorLocalImages } from '~/composables/editor/useEditorLocalImages';
 import { useEditorToolBar } from '~/composables/editor/useEditorToolBar';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { TaskList, TaskItem } from '@tiptap/extension-list';
 
 // 编辑器引用
 const editorRef = useTemplateRef<{ editor: Editor }>('editorRef');
@@ -89,6 +91,13 @@ const emojiItems = computed(() => {
 
 const editorExtensions = computed(() => {
   return [
+    TextAlign.configure({
+      types: ['paragraph', 'heading'],
+      alignments: ['left', 'center', 'right', 'justify'],
+      defaultAlignment: 'left',
+    }),
+    TaskList,
+    TaskItem,
     LuminaEmoji,
     LocalImageResolver.configure({
       resolve: resolveLocalImageSrc,

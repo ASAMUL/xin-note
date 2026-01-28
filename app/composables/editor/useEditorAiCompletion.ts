@@ -1,4 +1,3 @@
-import type { Ref } from 'vue';
 import type { DropdownMenuItem } from '#ui/components/DropdownMenu.vue';
 import type { EditorCustomHandlers } from '#ui/types/editor';
 import type { Editor } from '@tiptap/vue-3';
@@ -51,23 +50,17 @@ export const useEditorAiCompletion = (params: {
     };
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const getAiStorage = (editor: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getAiStorage = (editor: Editor) => {
     return (editor.storage as any)?.aiCompletion as any;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const requestAiSuggestions = async (_editor: any, textBefore: string): Promise<string[]> => {
     const key = aiApiKey.value?.trim();
     if (!key) return [];
 
     aiLoading.value = true;
     try {
-      const endpoint = `${(aiBaseUrl.value || 'https://api.openai.com/v1').replace(
-        /\/+$/,
-        '',
-      )}/chat/completions`;
+      const endpoint = `${aiBaseUrl.value.replace(/\/+$/, '')}`;
       const res: any = await $fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -227,7 +220,8 @@ export const useEditorAiCompletion = (params: {
           return (editor as any).chain();
         },
         isActive: (editor, _cmd) => !!getAiStorage(editor)?.visible,
-        isDisabled: (editor, _cmd) => !aiApiKey.value || aiLoading.value || !editor.state.selection.empty,
+        isDisabled: (editor, _cmd) =>
+          !aiApiKey.value || aiLoading.value || !editor.state.selection.empty,
       },
     };
 
@@ -265,4 +259,3 @@ export const useEditorAiCompletion = (params: {
     onSelectionUpdate,
   };
 };
-
