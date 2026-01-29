@@ -13,7 +13,7 @@
   --bg-sidebar: #e8e5dc; /* 侧边栏：稍深 */
   --bg-paper: #faf9f6; /* 纸张：云峰白 */
   --bg-popup: #ffffff; /* 弹窗背景 */
-
+  --bg-code: rgba(66, 35, 3, 0.031);
   /* 边框与分隔 */
   --border-color: #d6d3c9;
 
@@ -63,7 +63,7 @@
   --bg-sidebar: #161618;
   --bg-paper: #1a1a1c;
   --bg-popup: #1f1f22;
-
+  --bg-code: rgba(66, 35, 3, 0.031);
   --border-color: #27272a;
 
   --text-main: #e4e4e7;

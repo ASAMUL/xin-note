@@ -18,11 +18,14 @@
     "@nuxt/icon": "^2.1.0",
     "@nuxt/ui": "^4.4.0",
     "@pinia/nuxt": "0.11.3",
+    "@tiptap/extension-code-block-lowlight": "3.17.1",
     "@tiptap/extension-emoji": "^3.17.1",
+    "@tiptap/extension-file-handler": "3.17.1",
     "@tiptap/extension-list": "^3.17.1",
     "@tiptap/extension-text-align": "^3.17.1",
     "@vueuse/core": "^14.1.0",
     "@vueuse/integrations": "^14.1.0",
+    "lowlight": "^3.3.0",
     "nuxt": "^4.3.0",
     "pinia": "^3.0.4",
     "sortablejs": "^1.15.6",
@@ -40,7 +43,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@parcel/watcher": "2.4.1"
+      "@parcel/watcher": "2.4.1",
+      "@tiptap/extension-text-style": "3.17.1"
     }
   }
 }

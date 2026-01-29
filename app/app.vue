@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import 'highlight.js/styles/github-dark.css';
+
 const { toggleAiSidebar } = useLayoutState();
 
 onMounted(() => {

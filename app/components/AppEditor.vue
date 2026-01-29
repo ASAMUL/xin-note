@@ -13,6 +13,12 @@ import { useEditorLocalImages } from '~/composables/editor/useEditorLocalImages'
 import { useEditorToolBar } from '~/composables/editor/useEditorToolBar';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
+import { common, createLowlight } from 'lowlight';
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
+import FileHandler from '@tiptap/extension-file-handler';
+import type { EditorProps } from '@nuxt/ui';
+
+const lowlight = createLowlight(common);
 
 // 编辑器引用
 const editorRef = useTemplateRef<{ editor: Editor }>('editorRef');
@@ -89,22 +95,23 @@ const emojiItems = computed(() => {
   return gitHubEmojis.filter((emoji) => !emoji.name.startsWith('regional_indicator_'));
 });
 
-const editorExtensions = computed(() => {
-  return [
-    TextAlign.configure({
-      types: ['paragraph', 'heading'],
-      alignments: ['left', 'center', 'right', 'justify'],
-      defaultAlignment: 'left',
-    }),
-    TaskList,
-    TaskItem,
-    LuminaEmoji,
-    LocalImageResolver.configure({
-      resolve: resolveLocalImageSrc,
-    }),
-    aiCompletionExtension.value,
-  ] as any;
-});
+const editorExtensions = [
+  TextAlign.configure({
+    types: ['paragraph', 'heading'],
+    alignments: ['left', 'center', 'right', 'justify'],
+    defaultAlignment: 'left',
+  }),
+  CodeBlockLowlight.configure({
+    lowlight,
+  }),
+  TaskList,
+  TaskItem,
+  LuminaEmoji,
+  LocalImageResolver.configure({
+    resolve: resolveLocalImageSrc,
+  }),
+  aiCompletionExtension.value,
+];
 </script>
 
 <template>
@@ -129,6 +136,11 @@ const editorExtensions = computed(() => {
             v-slot="{ editor }"
             :key="activeTab?.id"
             v-model="editorContent"
+            :editorProps="{
+              attributes: {
+                spellcheck: 'false',
+              },
+            }"
             content-type="markdown"
             :extensions="editorExtensions"
             :handlers="customHandlers"
@@ -138,7 +150,6 @@ const editorExtensions = computed(() => {
             :on-selection-update="onSelectionUpdate"
           >
             <UEditorToolbar :editor="editor" :items="toolbarItems" layout="bubble" />
-
             <UEditorDragHandle
               v-slot="{ ui }"
               :editor="editor"
