@@ -15,8 +15,6 @@ import { TextAlign } from '@tiptap/extension-text-align';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import { common, createLowlight } from 'lowlight';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
-import FileHandler from '@tiptap/extension-file-handler';
-import type { EditorProps } from '@nuxt/ui';
 
 const lowlight = createLowlight(common);
 
@@ -33,9 +31,8 @@ defineShortcuts({
   },
 });
 // 本地图片（上传/粘贴 + src 解析）
-const { resolveLocalImageSrc, handlePaste, imageHandlers } = useEditorLocalImages({
+const { resolveLocalImageSrc, fileHandlerExtension, imageHandlers } = useEditorLocalImages({
   activeTab,
-  editorRef,
 });
 
 // AI 续写（候选/定位/handlers + extension）
@@ -106,6 +103,7 @@ const editorExtensions = [
   }),
   TaskList,
   TaskItem,
+  fileHandlerExtension.value,
   LuminaEmoji,
   LocalImageResolver.configure({
     resolve: resolveLocalImageSrc,
@@ -146,7 +144,6 @@ const editorExtensions = [
             :handlers="customHandlers"
             placeholder="写点什么吧…（/ 打开命令，: 打开 emoji，Tab 生成灵感）"
             class="nuxt-editor"
-            :on-paste="(e) => handlePaste(e)"
             :on-selection-update="onSelectionUpdate"
           >
             <UEditorToolbar :editor="editor" :items="toolbarItems" layout="bubble" />
