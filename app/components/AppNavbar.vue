@@ -275,7 +275,7 @@ const navItems = ref([
     icon: 'i-lucide-file',
     children: [
       { label: '新建笔记', icon: 'i-lucide-file-plus', onSelect: handleCreateNoteFromMenu },
-      { label: '打开文件夹...', icon: 'i-lucide-folder-open', onSelect: handleOpenWorkspaceFolder },
+      { label: '文件夹...', icon: 'i-lucide-folder-open', onSelect: handleOpenWorkspaceFolder },
       { label: '打开文件...', icon: 'i-lucide-file-text', onSelect: handleOpenMarkdownFile },
       { label: '保存', icon: 'i-lucide-save', shortcut: 'Ctrl+S', onSelect: handleSaveFromMenu },
       {
