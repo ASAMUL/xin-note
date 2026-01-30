@@ -139,6 +139,9 @@ const editorExtensions = [
                 spellcheck: 'false',
               },
             }"
+            :starter-kit="{
+              codeBlock: false,
+            }"
             content-type="markdown"
             :extensions="editorExtensions"
             :handlers="customHandlers"
