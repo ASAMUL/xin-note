@@ -11,47 +11,49 @@ onNuxtReady(() => {
 </script>
 
 <template>
-  <!-- 启动画面 -->
-  <AppLaunchScreen />
+  <div class="h-screen w-screen overflow-hidden">
+    <!-- 启动画面 -->
+    <AppLaunchScreen />
 
-  <div
-    class="h-screen w-screen overflow-hidden flex flex-col app-container"
-    :class="{ 'app-ready': isAppReady }"
-    style="background-color: var(--bg-app); color: var(--text-main)"
-  >
-    <!-- Top Navbar -->
-    <AppNavbar />
-    <!-- 透明无边框窗口：边缘拖拽缩放热区 -->
-    <AppWindowResizeHandles />
+    <div
+      class="h-screen w-screen overflow-hidden flex flex-col app-container"
+      :class="{ 'app-ready': isAppReady }"
+      style="background-color: var(--bg-app); color: var(--text-main)"
+    >
+      <!-- Top Navbar -->
+      <AppNavbar />
+      <!-- 透明无边框窗口：边缘拖拽缩放热区 -->
+      <AppWindowResizeHandles />
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex overflow-hidden">
-      <!-- Left Sidebar -->
-      <Transition name="slide-fade-left">
-        <aside v-if="isLeftSidebarOpen && !isZenMode" class="w-64 shrink-0">
-          <AppSidebar />
-        </aside>
-      </Transition>
+      <!-- Main Content Area -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- Left Sidebar -->
+        <Transition name="slide-fade-left">
+          <aside v-if="isLeftSidebarOpen && !isZenMode" class="w-64 shrink-0">
+            <AppSidebar />
+          </aside>
+        </Transition>
 
-      <!-- Center Content -->
-      <main class="flex-1 min-w-0 flex flex-col relative z-0">
-        <slot />
-      </main>
+        <!-- Center Content -->
+        <main class="flex-1 min-w-0 flex flex-col relative z-0">
+          <slot />
+        </main>
 
-      <!-- Right Sidebar (AI) -->
-      <Transition name="slide-fade-right">
-        <aside
-          v-if="isAiSidebarOpen && !isZenMode"
-          class="w-80 shrink-0"
-          style="border-left: 1px solid var(--border-color)"
-        >
-          <AiAssistant />
-        </aside>
-      </Transition>
+        <!-- Right Sidebar (AI) -->
+        <Transition name="slide-fade-right">
+          <aside
+            v-if="isAiSidebarOpen && !isZenMode"
+            class="w-80 shrink-0"
+            style="border-left: 1px solid var(--border-color)"
+          >
+            <AiAssistant />
+          </aside>
+        </Transition>
+      </div>
+
+      <!-- Global Footer -->
+      <AppFooter />
     </div>
-
-    <!-- Global Footer -->
-    <AppFooter />
   </div>
 </template>
 
@@ -60,8 +62,7 @@ onNuxtReady(() => {
 .app-container {
   opacity: 0;
   transform: scale(0.98);
-  transition:
-    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

@@ -143,10 +143,9 @@ export function useSettings() {
     await saveSettings(newSettings);
   };
 
-  // 客户端初始化时加载设置
-  if (import.meta.client && !isInitialized.value && !isLoading.value) {
-    loadSettings();
-  }
+  onMounted(() => {
+    void loadSettings();
+  });
 
   return {
     settings: computed(() => settings.value),

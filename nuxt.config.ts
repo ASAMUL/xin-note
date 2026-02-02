@@ -14,10 +14,8 @@ export default defineNuxtConfig({
     '@nuxt/hints',
     'shadcn-nuxt',
   ],
-  shadcn: {
-    prefix: '',
-    componentDir: '~/components/ui',
-  },
+  components: [{ path: '~/components', extensions: ['vue'] }],
+  shadcn: { prefix: '', componentDir: '~/components/ui' },
   vite: {
     optimizeDeps: {
       include: [

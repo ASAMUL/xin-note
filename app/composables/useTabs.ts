@@ -437,10 +437,9 @@ export function useTabs() {
     await window.ipcRenderer.invoke('clipboard-write', tab.path);
   };
 
-  // 客户端初始化时恢复工作区
-  if (import.meta.client && !isWorkspaceRestored.value && !isRestoring.value) {
-    restoreWorkspace();
-  }
+  onMounted(() => {
+    void restoreWorkspace();
+  });
 
   return {
     // 状态

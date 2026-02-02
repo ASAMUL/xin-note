@@ -128,4 +128,3 @@ onBeforeUnmount(() => {
   touch-action: none;
 }
 </style>
-

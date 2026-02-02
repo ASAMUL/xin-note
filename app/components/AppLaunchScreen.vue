@@ -1,30 +1,14 @@
 <script setup lang="ts">
-/**
- * 启动画面组件
- * 在应用加载时显示优雅的启动动画，加载完成后淡出
- */
-
 // 控制启动画面的显示状态
-const isVisible = ref(true);
 const isLoaded = ref(false);
-
-// 组件挂载后，等待一小段时间确保内容加载，然后开始淡出
-onMounted(() => {
-  // 给主界面一点时间加载
-  setTimeout(() => {
-    isLoaded.value = true;
-  }, 300);
-
-  // 启动画面显示时间（可调整）
-  setTimeout(() => {
-    isVisible.value = false;
-  }, 1200);
+onNuxtReady(() => {
+  isLoaded.value = true;
 });
 </script>
 
 <template>
   <Transition name="launch-fade">
-    <div v-if="isVisible" class="launch-screen">
+    <div v-if="!isLoaded" class="launch-screen">
       <!-- 背景渐变遮罩 -->
       <div class="launch-backdrop" />
 
