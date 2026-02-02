@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { existsSync, statSync, readdirSync } from 'node:fs';
 import { setupWindowEdgeResizeIpc } from './window-edge-resize';
+import { setupAiIpc } from './ai-ipc';
 
 /**
  * 让渲染进程可以安全加载本地 assets 图片：
@@ -414,10 +415,10 @@ function initIpc() {
         const buffer = Buffer.isBuffer(data)
           ? data
           : data instanceof Uint8Array
-            ? Buffer.from(data)
-            : data instanceof ArrayBuffer
-              ? Buffer.from(new Uint8Array(data))
-              : Buffer.from(data);
+          ? Buffer.from(data)
+          : data instanceof ArrayBuffer
+          ? Buffer.from(new Uint8Array(data))
+          : Buffer.from(data);
 
         await fs.writeFile(absPath, buffer);
 
@@ -625,6 +626,9 @@ function initIpc() {
       }
     },
   );
+
+  // ========== AI IPC（主进程代理请求，避免 CORS + 减少 renderer 暴露）==========
+  setupAiIpc();
 
   // 透明无边框窗口边缘拖拽缩放（自定义实现）
   setupWindowEdgeResizeIpc(() => win);

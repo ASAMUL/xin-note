@@ -4,6 +4,7 @@ import type { Editor } from '@tiptap/vue-3';
 
 import type { AiCompletionState } from '~/components/editor/EditorAiCompletionExtension';
 import { AiCompletion } from '~/components/editor/EditorAiCompletionExtension';
+import { useAiGatewayModel } from '~/composables/ai/useAiGatewayModel';
 
 /**
  * AppEditor 内的 AI 续写（候选/ghost/定位/下拉）逻辑封装。
@@ -15,7 +16,7 @@ export const useEditorAiCompletion = (params: {
   editorHostRef: Ref<HTMLElement | null>;
 }) => {
   const { editorRef, editorHostRef } = params;
-  const { aiApiKey, aiBaseUrl, aiModel } = useSettings();
+  const { aiApiKey, aiBaseUrl, aiModel, resolved } = useAiGatewayModel();
 
   /**
    * ========== AI Completion（Tab 触发/接受）==========
@@ -55,42 +56,21 @@ export const useEditorAiCompletion = (params: {
   };
 
   const requestAiSuggestions = async (_editor: any, textBefore: string): Promise<string[]> => {
-    const key = aiApiKey.value?.trim();
-    if (!key) return [];
+    if (!resolved.value.isConfigured) return [];
+    if (!window.ipcRenderer) return [];
 
     aiLoading.value = true;
     try {
-      const endpoint = `${aiBaseUrl.value.replace(/\/+$/, '')}`;
-      const res: any = await $fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
+      const res = (await window.ipcRenderer.invoke('ai:editor-suggest', {
+        settings: {
+          apiKey: aiApiKey.value,
+          baseURL: aiBaseUrl.value,
+          model: aiModel.value,
         },
-        body: {
-          model: aiModel.value || 'gpt-4o-mini',
-          n: 3,
-          temperature: 0.7,
-          max_tokens: 80,
-          messages: [
-            {
-              role: 'system',
-              content:
-                '你是一个写作续写助手。只输出“续写的新增内容”，不要复述用户已有内容。最多输出 1 句话。保持原文语气与格式。',
-            },
-            {
-              role: 'user',
-              content: `请基于以下内容继续写作（只输出续写部分）：\n\n${textBefore}`,
-            },
-          ],
-        },
-      });
+        textBefore,
+      })) as unknown;
 
-      const choices = Array.isArray(res?.choices) ? res.choices : [];
-      return choices
-        .map((c: any) => c?.message?.content ?? c?.text ?? '')
-        .filter(Boolean)
-        .slice(0, 3);
+      return Array.isArray(res) ? (res as string[]) : [];
     } catch (e) {
       console.error('AI completion 请求失败:', e);
       return [];
@@ -101,8 +81,7 @@ export const useEditorAiCompletion = (params: {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const triggerAiSuggest = async (editor: any) => {
-    const key = aiApiKey.value?.trim();
-    if (!key) return;
+    if (!resolved.value.isConfigured) return;
     if (aiLoading.value) return;
 
     const { state } = editor;
@@ -214,14 +193,14 @@ export const useEditorAiCompletion = (params: {
     const handlers: EditorCustomHandlers = {
       aiSuggest: {
         canExecute: (editor, _cmd) =>
-          !!aiApiKey.value && !aiLoading.value && editor.state.selection.empty,
+          resolved.value.isConfigured && !aiLoading.value && editor.state.selection.empty,
         execute: (editor, _cmd) => {
           triggerAiSuggest(editor);
           return (editor as any).chain();
         },
         isActive: (editor, _cmd) => !!getAiStorage(editor)?.visible,
         isDisabled: (editor, _cmd) =>
-          !aiApiKey.value || aiLoading.value || !editor.state.selection.empty,
+          !resolved.value.isConfigured || aiLoading.value || !editor.state.selection.empty,
       },
     };
 
