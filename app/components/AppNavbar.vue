@@ -3,44 +3,14 @@ import SaveAsDialog from '~/components/dialogs/SaveAsDialog.vue';
 import ShortcutsDialog from '~/components/dialogs/ShortcutsDialog.vue';
 import DocsDialog from '~/components/dialogs/DocsDialog.vue';
 import AboutDialog from '~/components/dialogs/AboutDialog.vue';
+import SettingsDialog from '~/components/settings/SettingsDialog.vue';
 
 // 设置
-const {
-  notesDirectory,
-  selectNotesDirectory,
-  aiApiKey,
-  aiBaseUrl,
-  aiModel,
-  setAiApiKey,
-  setAiBaseUrl,
-  setAiModel,
-} = useSettings();
+const { notesDirectory, selectNotesDirectory } = useSettings();
 const showSettings = ref(false);
 
 // 布局（AI 侧边栏等）
 const { toggleAiSidebar, toggleLeftSidebar, toggleZenMode } = useLayoutState();
-
-// AI 设置（用草稿值编辑，点击保存后写入 settings.json）
-const aiKeyDraft = ref('');
-const aiBaseUrlDraft = ref('');
-const aiModelDraft = ref('');
-const showAiKey = ref(false);
-
-watch(
-  () => showSettings.value,
-  (open) => {
-    if (!open) return;
-    aiKeyDraft.value = aiApiKey.value || '';
-    aiBaseUrlDraft.value = aiBaseUrl.value || 'https://api.openai.com/v1';
-    aiModelDraft.value = aiModel.value || 'gpt-4o-mini';
-  },
-);
-
-const saveAiSettings = async () => {
-  await setAiBaseUrl(aiBaseUrlDraft.value);
-  await setAiModel(aiModelDraft.value);
-  await setAiApiKey(aiKeyDraft.value);
-};
 
 // 命令面板状态
 const searchOpen = ref(false);
@@ -497,101 +467,8 @@ const navItems = ref([
       </template>
     </UModal>
 
-    <!-- 设置弹窗 -->
-    <UModal v-model:open="showSettings" :ui="{ content: 'max-w-md' }">
-      <template #content>
-        <div class="settings-dialog">
-          <!-- 头部 -->
-          <div class="settings-header">
-            <div class="settings-icon">
-              <UIcon name="i-lucide-settings" class="w-5 h-5" />
-            </div>
-            <h3 class="settings-title">设置</h3>
-          </div>
-
-          <!-- 设置项 -->
-          <div class="settings-content">
-            <!-- 笔记存储目录 -->
-            <div class="settings-item">
-              <div class="settings-item-header">
-                <UIcon name="i-lucide-folder" class="w-4 h-4" />
-                <span class="settings-item-label">笔记存储目录</span>
-              </div>
-              <div class="settings-item-value">
-                <span v-if="notesDirectory" class="directory-path">{{ notesDirectory }}</span>
-                <span v-else class="directory-empty">未设置</span>
-                <UButton
-                  variant="soft"
-                  color="primary"
-                  size="xs"
-                  icon="i-lucide-folder-open"
-                  @click="selectNotesDirectory()"
-                >
-                  {{ notesDirectory ? '更改' : '选择' }}
-                </UButton>
-              </div>
-            </div>
-
-            <!-- AI 配置 -->
-            <div class="settings-item">
-              <div class="settings-item-header">
-                <UIcon name="i-lucide-sparkles" class="w-4 h-4" />
-                <span class="settings-item-label">AI 配置</span>
-              </div>
-
-              <div class="flex flex-col gap-2">
-                <UInput
-                  v-model="aiBaseUrlDraft"
-                  size="sm"
-                  icon="i-lucide-link"
-                  placeholder="Base URL（例如 https://api.openai.com/v1）"
-                />
-                <UInput
-                  v-model="aiModelDraft"
-                  size="sm"
-                  icon="i-lucide-box"
-                  placeholder="模型（例如 gpt-4o-mini）"
-                />
-                <UInput
-                  v-model="aiKeyDraft"
-                  size="sm"
-                  :type="showAiKey ? 'text' : 'password'"
-                  icon="i-lucide-key"
-                  placeholder="API Key（仅保存在本地 settings.json）"
-                >
-                  <template #trailing>
-                    <UButton
-                      :icon="showAiKey ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-                      variant="ghost"
-                      color="neutral"
-                      size="xs"
-                      @click="showAiKey = !showAiKey"
-                    />
-                  </template>
-                </UInput>
-              </div>
-
-              <div class="flex justify-end gap-2 mt-2">
-                <UButton
-                  variant="soft"
-                  color="primary"
-                  size="xs"
-                  icon="i-lucide-save"
-                  @click="saveAiSettings"
-                >
-                  保存
-                </UButton>
-              </div>
-            </div>
-          </div>
-
-          <!-- 底部 -->
-          <div class="settings-footer">
-            <UButton variant="ghost" color="neutral" @click="showSettings = false">关闭</UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
+    <!-- 设置弹窗（大弹窗 + 左侧菜单） -->
+    <SettingsDialog v-model:open="showSettings" />
   </header>
 </template>
 
@@ -864,98 +741,5 @@ const navItems = ref([
 .dark .option-btn:hover {
   background-color: var(--bg-popup);
   box-shadow: 0 4px 12px var(--shadow-color);
-}
-
-/* 设置弹窗样式 */
-.settings-dialog {
-  padding: 1.5rem;
-}
-
-.settings-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.settings-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--accent-color), var(--accent-hover));
-  border-radius: 10px;
-  color: white;
-}
-
-.settings-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-main);
-  margin: 0;
-}
-
-.settings-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.settings-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  background-color: var(--bg-app);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-}
-
-.settings-item-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--text-main);
-}
-
-.settings-item-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.settings-item-value {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.directory-path {
-  flex: 1;
-  font-size: 0.75rem;
-  color: var(--text-mute);
-  word-break: break-all;
-  padding: 0.5rem;
-  background-color: var(--bg-sidebar);
-  border-radius: 6px;
-}
-
-.directory-empty {
-  flex: 1;
-  font-size: 0.75rem;
-  color: var(--text-mute);
-  font-style: italic;
-}
-
-.settings-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.dark .settings-item {
-  background-color: var(--bg-paper);
 }
 </style>

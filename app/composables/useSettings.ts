@@ -3,6 +3,8 @@
  * 管理用户偏好设置，使用 JSON 文件持久化存储
  */
 
+import { parseAiBaseUrl } from '~/utils/ai/baseUrl';
+
 export interface AppSettings {
   notesDirectory: string | null; // 笔记存储目录
   autoSaveDelay: number; // 自动保存延迟（毫秒）
@@ -24,8 +26,10 @@ const defaultSettings: AppSettings = {
   autoSaveDelay: 1500,
   theme: 'system',
   aiApiKey: null,
-  aiBaseUrl: 'https://api.openai.com/v1',
-  aiModel: 'gpt-4o-mini',
+  // 用户通常只需要填写「Base URL」本体；请求时会自动追加 /v1（末尾加 # 可禁用）
+  aiBaseUrl: 'https://api.openai.com',
+  // 推荐使用 provider/model 形式（更容易兼容多家供应商）
+  aiModel: 'openai/gpt-4o-mini',
 };
 
 export function useSettings() {
@@ -122,8 +126,19 @@ export function useSettings() {
 
   // 更新 AI Base URL
   const setAiBaseUrl = async (url: string) => {
-    const normalized = url.trim().replace(/\/+$/, '');
-    const newSettings = { ...settings.value, aiBaseUrl: normalized || defaultSettings.aiBaseUrl };
+    // 规范化规则：
+    // - 去空格、去末尾斜杠
+    // - 支持末尾 `#`：禁用自动追加 /v1
+    // - 若用户误填了 /v1/chat/completions 等 endpoint，会自动裁剪回 baseURL
+    const parsed = parseAiBaseUrl(url);
+    const normalized = parsed.baseURL
+      ? `${parsed.baseURL}${parsed.disableAutoAppendV1 ? '#' : ''}`
+      : '';
+
+    const newSettings = {
+      ...settings.value,
+      aiBaseUrl: normalized || defaultSettings.aiBaseUrl,
+    };
     settings.value = newSettings;
     await saveSettings(newSettings);
   };
