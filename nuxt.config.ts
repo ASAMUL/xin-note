@@ -1,11 +1,23 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import path from 'path';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
-  modules: ['@pinia/nuxt', '@nuxt/ui', 'nuxt-electron', '@nuxt/fonts', '@nuxt/hints'],
+  modules: [
+    '@pinia/nuxt',
+    '@nuxt/ui',
+    'nuxt-electron',
+    '@nuxt/fonts',
+    '@nuxt/hints',
+    'shadcn-nuxt',
+  ],
+  shadcn: {
+    prefix: '',
+    componentDir: '~/components/ui',
+  },
   vite: {
     optimizeDeps: {
       include: [
@@ -17,6 +29,7 @@ export default defineNuxtConfig({
         'prosemirror-gapcursor',
       ],
     },
+    plugins: [tailwindcss()],
   },
 
   // 页面和布局过渡动画
