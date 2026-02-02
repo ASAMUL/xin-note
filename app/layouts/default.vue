@@ -21,6 +21,8 @@ onNuxtReady(() => {
   >
     <!-- Top Navbar -->
     <AppNavbar />
+    <!-- 透明无边框窗口：边缘拖拽缩放热区 -->
+    <AppWindowResizeHandles />
 
     <!-- Main Content Area -->
     <div class="flex-1 flex overflow-hidden">

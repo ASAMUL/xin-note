@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, screen, dialog, shell, clipboard, protocol
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { existsSync, statSync, readdirSync } from 'node:fs';
+import { setupWindowEdgeResizeIpc } from './window-edge-resize';
 
 /**
  * 让渲染进程可以安全加载本地 assets 图片：
@@ -151,6 +152,8 @@ function createWindow() {
   win = new BrowserWindow({
     width,
     height,
+    minWidth: 800,
+    minHeight: 600,
     frame: false,
     transparent: true,
     center: true,
@@ -622,6 +625,9 @@ function initIpc() {
       }
     },
   );
+
+  // 透明无边框窗口边缘拖拽缩放（自定义实现）
+  setupWindowEdgeResizeIpc(() => win);
 }
 
 app.on('window-all-closed', () => {
