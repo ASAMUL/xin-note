@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import 'highlight.js/styles/github-dark.css';
+import 'highlight.js/styles/github.css';
 
 const { toggleAiSidebar } = useLayoutState();
 
