@@ -68,9 +68,14 @@ export default defineNuxtConfig({
             //
             //  one of the solutions is 'externalize' such modules.
             //
-            // rollupOptions: {
-            //   external: ['node:sqlite'],
-            // },
+            rollupOptions: {
+              // 原生 .node 模块不适合被 Vite/Rollup bundle，必须 external 走运行时加载
+              external: ['@lancedb/lancedb', 'apache-arrow', 'reflect-metadata'],
+            },
+          },
+          optimizeDeps: {
+            // 避免对原生模块做预打包
+            exclude: ['@lancedb/lancedb'],
           },
 
           resolve: {

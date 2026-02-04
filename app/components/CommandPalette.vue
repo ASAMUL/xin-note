@@ -4,6 +4,7 @@
  * 提供快速搜索和执行命令的功能
  */
 import type { NoteItem } from '~/composables/useNotes';
+import { useNoteContentSearch } from '~/composables/search/useNoteContentSearch';
 
 // Props 定义
 const props = defineProps<{
@@ -22,6 +23,11 @@ const { openTabs, openTab, openTabByPath, saveTab, activeTab } = useTabs();
 const { notes, createNote } = useNotes();
 
 // 内部状态
+const searchTerm = ref('');
+const { results: contentSearchResults, loading: contentSearchLoading } = useNoteContentSearch({
+  searchTerm,
+  notesDirectory,
+});
 const isOpen = computed({
   get: () => props.open,
   set: (value) => emit('update:open', value),
@@ -53,6 +59,7 @@ const getRelativePath = (filePath: string): string => {
 // 关闭命令面板
 const closePanel = () => {
   isOpen.value = false;
+  searchTerm.value = '';
 };
 
 // 命令面板分组
@@ -130,6 +137,30 @@ const commandGroups = computed(() => {
     });
   }
 
+  // 2.5 内容搜索（BM25 / 全文检索）
+  const q = searchTerm.value.trim();
+  if (q && notesDirectory.value) {
+    const items = contentSearchResults.value.map((hit) => ({
+      id: `content-${hit.path}`,
+      label: hit.name.replace('.md', ''),
+      suffix: getRelativePath(hit.path),
+      description: hit.snippet,
+      icon: 'i-lucide-file-search',
+      onSelect: async () => {
+        closePanel();
+        await openTabByPath(hit.path);
+      },
+    }));
+
+    // 只有在有输入时显示，且由我们自己提供搜索结果（不走内部 Fuse 过滤）
+    groups.push({
+      id: 'content',
+      label: '内容搜索',
+      ignoreFilter: true,
+      items,
+    });
+  }
+
   // 3. 全部笔记组
   const allNotes = flattenNotes(notes.value);
   if (allNotes.length > 0) {
@@ -166,7 +197,9 @@ const handleCommandSelect = (item: any) => {
   <UModal v-model:open="isOpen" :ui="{ content: 'max-w-xl' }">
     <template #content>
       <UCommandPalette
-        placeholder="搜索笔记、命令..."
+        v-model:search-term="searchTerm"
+        placeholder="搜索笔记、内容、命令..."
+        :loading="contentSearchLoading"
         :groups="commandGroups"
         :fuse="{
           fuseOptions: {
@@ -181,6 +214,13 @@ const handleCommandSelect = (item: any) => {
         }"
         @update:model-value="handleCommandSelect"
       >
+        <!-- 内容搜索：展示匹配片段 -->
+        <template #item-description="{ item }">
+          <span v-if="item?.description" class="command-item-desc text-xs text-dimmed">
+            {{ item.description }}
+          </span>
+        </template>
+
         <!-- 空状态 -->
         <template #empty="{ searchTerm }">
           <div class="command-empty">
@@ -252,6 +292,13 @@ const handleCommandSelect = (item: any) => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.command-item-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .command-hint {

@@ -3,10 +3,19 @@
   "appId": "cn.illumine.note.cn",
   "productName": "illumine",
   "asar": true,
+  "asarUnpack": ["**/*.node"],
   "directories": {
     "output": "release/${version}"
   },
-  "files": [".output/**/*", "dist-electron", "!**/*.map", "!**/*.d.ts"],
+  "files": [
+    ".output/**/*",
+    "dist-electron",
+    "node_modules/@lancedb/**",
+    "node_modules/apache-arrow/**",
+    "node_modules/reflect-metadata/**",
+    "!**/*.map",
+    "!**/*.d.ts"
+  ],
   "mac": {
     "artifactName": "${productName}_${version}.${ext}",
     "target": ["dmg"]

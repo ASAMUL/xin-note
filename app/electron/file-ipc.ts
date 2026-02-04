@@ -1,7 +1,70 @@
-import { ipcMain, clipboard, shell } from 'electron';
+import { ipcMain, clipboard, shell, app } from 'electron';
 import { existsSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import fs from 'fs/promises';
+import { buildRagChunksForDoc } from './rag/notes-indexer';
+import { ragRebuildDocChunks } from './rag/write';
+
+const SETTINGS_FILE = 'settings.json';
+
+// ========== 内容索引（LanceDB BM25）辅助函数 ==========
+
+let notesDirCache: { value: string | null; expiresAt: number } | null = null;
+async function getNotesDirectoryCached() {
+  const now = Date.now();
+  if (notesDirCache && notesDirCache.expiresAt > now) return notesDirCache.value;
+
+  try {
+    const configPath = path.join(app.getPath('userData'), SETTINGS_FILE);
+    const content = await fs.readFile(configPath, 'utf-8');
+    const json = JSON.parse(content || '{}') as { notesDirectory?: string | null };
+    const value = (json?.notesDirectory || '').toString().trim() || null;
+    notesDirCache = { value, expiresAt: now + 3000 };
+    return value;
+  } catch {
+    notesDirCache = { value: null, expiresAt: now + 3000 };
+    return null;
+  }
+}
+
+function normalizePathForCompare(p: string) {
+  return (p || '').replace(/\\/g, '/').toLowerCase();
+}
+
+function isUnderDirectory(filePath: string, rootDir: string) {
+  const f = normalizePathForCompare(filePath);
+  const d = normalizePathForCompare(rootDir).replace(/\/+$/, '');
+  return f === d || f.startsWith(`${d}/`);
+}
+
+const INDEX_DEBOUNCE_MS = 1200;
+const pendingIndexTimers = new Map<string, NodeJS.Timeout>();
+
+function scheduleContentIndexUpdate(filePath: string, content: string) {
+  const lower = (filePath || '').toLowerCase();
+  if (!lower.endsWith('.md')) return;
+
+  const old = pendingIndexTimers.get(filePath);
+  if (old) clearTimeout(old);
+
+  const timer = setTimeout(() => {
+    pendingIndexTimers.delete(filePath);
+
+    void (async () => {
+      const notesDir = await getNotesDirectoryCached();
+      if (!notesDir) return;
+      if (!isUnderDirectory(filePath, notesDir)) return;
+
+      const chunks = buildRagChunksForDoc(filePath, content);
+      // 不阻塞 file-write 返回：后台更新索引
+      await ragRebuildDocChunks(filePath, chunks);
+    })().catch((e) => {
+      console.error('[rag-index] 更新索引失败:', e);
+    });
+  }, INDEX_DEBOUNCE_MS);
+
+  pendingIndexTimers.set(filePath, timer);
+}
 export function setupFileIpc() {
   // 读取目录内容
   ipcMain.handle('dir-read', async (_event, dirPath: string) => {
@@ -63,6 +126,7 @@ export function setupFileIpc() {
     async (_event, { path: filePath, content }: { path: string; content: string }) => {
       try {
         await fs.writeFile(filePath, content, 'utf-8');
+        scheduleContentIndexUpdate(filePath, content);
         return true;
       } catch (error) {
         console.error('写入文件失败:', error);

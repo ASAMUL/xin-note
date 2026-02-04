@@ -5,6 +5,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { setupWindowEdgeResizeIpc } from './window-edge-resize';
 import { setupAiIpc } from './ai-ipc';
 import { setupFileIpc } from './file-ipc';
+import { setupRagIpc } from './rag/ipc';
+import { closeRagDbConnection } from './rag/db';
 
 /**
  * 让渲染进程可以安全加载本地 assets 图片：
@@ -362,6 +364,9 @@ function initIpc() {
   setupWindowEdgeResizeIpc(() => win);
   // 文件操作 IPC
   setupFileIpc();
+
+  // ========== RAG / 全文检索 IPC（LanceDB）==========
+  setupRagIpc();
 }
 
 app.on('window-all-closed', () => {
@@ -369,6 +374,11 @@ app.on('window-all-closed', () => {
     app.quit();
     win = null;
   }
+});
+
+app.on('before-quit', () => {
+  // 释放 LanceDB 资源（可选，但有助于干净退出）
+  void closeRagDbConnection();
 });
 
 app.on('activate', () => {
