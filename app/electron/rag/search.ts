@@ -67,8 +67,8 @@ export async function ragFtsSearch(
   const limit = clampLimit(params.limit, 20, 200);
   const ftsColumn =
     (options.ftsColumn || RAG_DEFAULT_TEXT_COLUMN).trim() || RAG_DEFAULT_TEXT_COLUMN;
-
-  const matchQuery = new lancedb.MatchQuery(query, ftsColumn, { operator: lancedb.Operator.And });
+  const operator = query.length <= 1 ? lancedb.Operator.Or : lancedb.Operator.And;
+  const matchQuery = new lancedb.MatchQuery(query, ftsColumn, { operator });
   const q = table.query().fullTextSearch(matchQuery);
   if (params.docId) {
     q.where(whereEqString(RAG_DOC_ID_COLUMN, params.docId));
@@ -130,14 +130,11 @@ export async function ragHybridSearch(
     (options.ftsColumn || RAG_DEFAULT_TEXT_COLUMN).trim() || RAG_DEFAULT_TEXT_COLUMN;
   const reranker = await getRrfReranker(params.rrfK ?? 60);
   const lancedb = await getLanceDb();
-  const matchQuery = new lancedb.MatchQuery(textQuery, ftsColumn, { operator: lancedb.Operator.And });
+  const operator = textQuery.length <= 1 ? lancedb.Operator.Or : lancedb.Operator.And;
+  const matchQuery = new lancedb.MatchQuery(textQuery, ftsColumn, { operator });
 
   // Hybrid：FTS + Vector，再用 RRF 融合排名
-  let q = table
-    .query()
-    .fullTextSearch(matchQuery)
-    .nearestTo(params.queryVector)
-    .rerank(reranker);
+  let q = table.query().fullTextSearch(matchQuery).nearestTo(params.queryVector).rerank(reranker);
 
   if (params.docId) {
     q = q.where(whereEqString(RAG_DOC_ID_COLUMN, params.docId));
@@ -148,4 +145,3 @@ export async function ragHybridSearch(
 
   return await q.toArray(exec);
 }
-

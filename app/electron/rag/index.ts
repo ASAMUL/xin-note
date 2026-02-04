@@ -22,12 +22,11 @@ const RAG_FTS_INDEX_VERSION = 1;
 const DEFAULT_FTS_OPTIONS = {
   baseTokenizer: 'ngram',
   ngramMinLength: 2,
-  // Keep this reasonably small to limit index size, but large enough to cover common short phrases.
   ngramMaxLength: 10,
   prefixOnly: false,
   lowercase: true,
-  // We don't need phrase queries for CommandPalette search; disabling positions reduces index size.
-  withPosition: false,
+  withPosition: true,
+  removeStopWords: true,
 } as const;
 
 async function buildRagSchemaAsync(vectorDim?: number | null) {
@@ -37,12 +36,12 @@ async function buildRagSchemaAsync(vectorDim?: number | null) {
     new Field(RAG_DEFAULT_TEXT_COLUMN, new Utf8(), false),
     new Field('meta', new Utf8(), true),
   ];
-
-  if (vectorDim && vectorDim > 0) {
-    const lancedb = await getLanceDb();
-    const vectorType = lancedb.newVectorType(vectorDim, new Float32());
-    fields.push(new Field('vector', vectorType, true));
-  }
+  //todo 向量索引暂时不用
+  // if (vectorDim && vectorDim > 0) {
+  //   const lancedb = await getLanceDb();
+  //   const vectorType = lancedb.newVectorType(vectorDim, new Float32());
+  //   fields.push(new Field('vector', vectorType, true));
+  // }
 
   return new Schema(fields);
 }
@@ -132,7 +131,11 @@ export async function ensureRagIndices(
   if (ensureFts && !hasIndex(indices, desiredFtsIndexName)) {
     // Drop stale indices on the same column (e.g. older tokenizer configs) so the planner won't pick them.
     for (const idx of indices) {
-      if (idx?.columns?.length === 1 && idx.columns[0] === ftsColumn && idx.name !== desiredFtsIndexName) {
+      if (
+        idx?.columns?.length === 1 &&
+        idx.columns[0] === ftsColumn &&
+        idx.name !== desiredFtsIndexName
+      ) {
         try {
           await table.dropIndex(idx.name);
         } catch {
