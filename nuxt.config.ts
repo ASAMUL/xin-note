@@ -38,9 +38,9 @@ export default defineNuxtConfig({
 
   fonts: {
     families: [
-      { name: 'Inter', provider: 'google' },
-      { name: 'Noto Serif SC', provider: 'google' },
-      { name: 'JetBrains Mono', provider: 'google' },
+      { name: 'Inter', provider: 'bunny' },
+      { name: 'Noto Serif SC', provider: 'bunny' },
+      { name: 'JetBrains Mono', provider: 'bunny' },
       { name: 'LXGW WenKai TC', provider: 'google' },
     ],
   },

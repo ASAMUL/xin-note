@@ -131,7 +131,6 @@ const editorExtensions = [
         <div ref="editorHostRef" class="relative">
           <UEditor
             ref="editorRef"
-            v-slot="{ editor }"
             :key="activeTab?.id"
             v-model="editorContent"
             :editorProps="{
@@ -149,51 +148,52 @@ const editorExtensions = [
             class="nuxt-editor"
             :on-selection-update="onSelectionUpdate"
           >
-            <UEditorToolbar :editor="editor" :items="toolbarItems" layout="bubble" />
-            <UEditorDragHandle
-              v-slot="{ ui }"
-              :editor="editor"
-              @node-change="selectedNode = $event"
-            >
-              <UDropdownMenu
-                v-slot="{ open }"
-                :modal="false"
-                :items="dragHandleMenuItems(editor)"
-                :content="{ side: 'left' }"
-                :ui="{ content: 'w-56', label: 'text-xs' }"
+            <template #default="{ editor }">
+              <UEditorToolbar :editor="editor" :items="toolbarItems" layout="bubble" />
+              <UEditorSuggestionMenu :editor="editor" :items="suggestionItems" />
+              <UEditorEmojiMenu :editor="editor" :items="emojiItems" />
+              <UEditorDragHandle
+                v-slot="{ ui }"
+                :editor="editor"
+                @node-change="selectedNode = $event"
               >
-                <UButton
-                  color="neutral"
-                  variant="ghost"
-                  active-variant="soft"
-                  size="sm"
-                  icon="i-lucide-grip-vertical"
-                  :active="open"
-                  :class="ui.handle()"
-                />
-              </UDropdownMenu>
-            </UEditorDragHandle>
+                <UDropdownMenu
+                  v-slot="{ open }"
+                  :modal="false"
+                  :items="dragHandleMenuItems(editor)"
+                  :content="{ side: 'left' }"
+                  :ui="{ content: 'w-56', label: 'text-xs' }"
+                >
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    active-variant="soft"
+                    size="sm"
+                    icon="i-lucide-grip-vertical"
+                    :active="open"
+                    :class="ui.handle()"
+                  />
+                </UDropdownMenu>
+              </UEditorDragHandle>
 
-            <UEditorSuggestionMenu :editor="editor" :items="suggestionItems" />
-            <UEditorEmojiMenu :editor="editor" :items="emojiItems" />
-
-            <!-- AI 候选下拉（第 1 条在 ghost，其余在下拉） -->
-            <div
-              v-if="aiState.visible && aiState.suggestions.length > 1"
-              class="absolute z-50"
-              :style="{ left: `${aiAnchor.x}px`, top: `${aiAnchor.y}px` }"
-            >
-              <UDropdownMenu :items="aiDropdownItems" :ui="{ content: 'w-80', label: 'text-xs' }">
-                <UButton
-                  icon="i-lucide-sparkles"
-                  color="neutral"
-                  variant="soft"
-                  size="xs"
-                  :loading="aiLoading"
-                  title="候选灵感"
-                />
-              </UDropdownMenu>
-            </div>
+              <!-- AI 候选下拉（第 1 条在 ghost，其余在下拉） -->
+              <div
+                v-if="aiState.visible && aiState.suggestions.length > 1"
+                class="absolute z-50"
+                :style="{ left: `${aiAnchor.x}px`, top: `${aiAnchor.y}px` }"
+              >
+                <UDropdownMenu :items="aiDropdownItems" :ui="{ content: 'w-80', label: 'text-xs' }">
+                  <UButton
+                    icon="i-lucide-sparkles"
+                    color="neutral"
+                    variant="soft"
+                    size="xs"
+                    :loading="aiLoading"
+                    title="候选灵感"
+                  />
+                </UDropdownMenu>
+              </div>
+            </template>
           </UEditor>
         </div>
       </ClientOnly>

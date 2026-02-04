@@ -77,7 +77,7 @@ const groupedModels = computed(() => {
   for (const raw of models.value) {
     const id = (raw || '').trim();
     if (!id) continue;
-    const provider = id.includes('/') ? id.split('/')[0] : '其它';
+    const provider = id.includes('/') ? id.split('/')[0] || '' : '其它';
     if (!map.has(provider)) map.set(provider, []);
     map.get(provider)!.push(id);
   }

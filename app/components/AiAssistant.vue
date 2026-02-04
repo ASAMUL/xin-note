@@ -55,10 +55,9 @@ const handleSubmit = async (payload: PromptInputMessage) => {
       style="border-bottom: 1px solid var(--border-color)"
     >
       <div class="flex flex-col gap-0.5">
-        <h2 class="font-semibold leading-tight" style="color: var(--text-main)">AI Assistant</h2>
+        <h2 class="font-semibold leading-tight" style="color: var(--text-main)">ai助理</h2>
         <p class="text-xs leading-tight" style="color: var(--text-mute)">
-          <span v-if="resolved.isConfigured">{{ resolved.modelId }}</span>
-          <span v-else>请先在设置中配置 AI Key / Model</span>
+          <span v-if="!resolved.isConfigured">请先在设置中配置 AI Key / 模型</span>
         </p>
       </div>
 
