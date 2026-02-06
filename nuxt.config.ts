@@ -37,11 +37,40 @@ export default defineNuxtConfig({
   },
 
   fonts: {
+    // 这是一个很好的全局默认设置，避免每个字体都写一遍
+    defaults: {
+      weights: [400, 500, 700], // 只下载常用字重
+      styles: ['normal', 'italic'],
+      subsets: ['latin'], // 默认只下载拉丁字符（英文/数字/符号）
+    },
+
     families: [
-      { name: 'Inter', provider: 'bunny' },
-      { name: 'Noto Serif SC', provider: 'bunny' },
-      { name: 'JetBrains Mono', provider: 'bunny' },
-      { name: 'LXGW WenKai TC', provider: 'google' },
+      {
+        name: 'Inter',
+        provider: 'bunny',
+        // 可以在这里覆盖默认设置，例如 Inter 不需要斜体
+        // styles: ['normal']
+      },
+      {
+        name: 'Noto Serif SC',
+        provider: 'google', // 或者是 bunny
+        // 中文字体通常没有 'latin' 子集概念，或者包含所有，
+        // 但显式指定需要的字重非常重要，因为中文字体文件很大
+        weights: [400, 700],
+        subsets: ['chinese-simplified', 'latin'],
+      },
+      {
+        name: 'JetBrains Mono',
+        provider: 'bunny',
+        weights: [400], // 代码字体通常只需要标准字重
+      },
+      {
+        name: 'LXGW WenKai TC',
+        provider: 'google',
+        // 霞鹜文楷繁体，注意中文字体通常不需要斜体
+        styles: ['normal'],
+        weights: [400],
+      },
     ],
   },
   ssr: false,

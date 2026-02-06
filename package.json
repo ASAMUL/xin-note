@@ -3,6 +3,7 @@
   "type": "module",
   "private": true,
   "version": "0.0.1",
+  "author": "asamul",
   "main": "dist-electron/main.js",
   "scripts": {
     "build": "nuxt build",
