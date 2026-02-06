@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * NoteTree 组件 - 使用 vuedraggable 实现 VSCode 风格的拖拽树形结构
  * 核心思路：每个文件夹展开时子项作为独立的 draggable 列表
@@ -46,6 +46,9 @@ watch(
 // 展开状态管理
 const expandedFolders = useState<Set<string>>('note-tree-expanded', () => new Set());
 
+// 当前正在异步加载子项的文件夹（避免重复请求）
+const folderLoadingPaths = ref<Set<string>>(new Set());
+
 // 当前拖拽悬停的文件夹路径（用于高亮显示）
 const dragOverFolderPath = useState<string | null>('note-tree-dragover', () => null);
 
@@ -53,7 +56,8 @@ const dragOverFolderPath = useState<string | null>('note-tree-dragover', () => n
 const currentDraggingItem = useState<NoteItem | null>('note-tree-dragging', () => null);
 
 // 路径比较：兼容 Windows 下 \ / 和大小写差异
-const normalizePathForCompare = (p: string) => p.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
+const normalizePathForCompare = (p: string) =>
+  p.replace(/\\/g, '/').replace(/\/$/, '').toLowerCase();
 
 // 当前项是否为激活文件（用于高亮）
 const isActive = (notePath: string) => {
@@ -61,16 +65,81 @@ const isActive = (notePath: string) => {
   return normalizePathForCompare(notePath) === normalizePathForCompare(props.activeTabPath);
 };
 
+/**
+ * 延迟加载文件夹子项：
+ * - 兼容主进程当前只返回“下一层”的目录结构
+ * - 用户点开深层文件夹时再按需请求一次 dir-read
+ */
+const ensureFolderChildrenLoaded = async (folder: NoteItem) => {
+  if (!folder.isFolder) return;
+
+  const children = folder.children || [];
+  if (children.length > 0) return;
+  if (folderLoadingPaths.value.has(folder.path)) return;
+  if (typeof window === 'undefined' || !window.ipcRenderer) return;
+
+  folderLoadingPaths.value.add(folder.path);
+  try {
+    const loadedChildren = (await window.ipcRenderer.invoke('dir-read', folder.path)) as
+      | NoteItem[]
+      | null;
+    folder.children = Array.isArray(loadedChildren) ? loadedChildren : [];
+  } catch (error) {
+    console.error('加载文件夹子项失败:', error);
+    folder.children = [];
+  } finally {
+    folderLoadingPaths.value.delete(folder.path);
+  }
+};
+
+/**
+ * 当前层级已展开但 items 为空时，按需补拉一次目录内容。
+ * 场景：拖拽移动后根数据刷新为浅层结构，深层已展开节点需要重新取子项。
+ */
+async function ensureCurrentLevelItemsLoaded() {
+  const parentPath = props.parentFolderPath;
+  if (!parentPath) return;
+  if (!expandedFolders.value.has(parentPath)) return;
+  if (props.items.length > 0 || localItems.value.length > 0) return;
+  if (folderLoadingPaths.value.has(parentPath)) return;
+  if (typeof window === 'undefined' || !window.ipcRenderer) return;
+
+  folderLoadingPaths.value.add(parentPath);
+  try {
+    const loadedChildren = (await window.ipcRenderer.invoke('dir-read', parentPath)) as
+      | NoteItem[]
+      | null;
+    localItems.value = Array.isArray(loadedChildren) ? loadedChildren : [];
+  } catch (error) {
+    console.error('补拉当前层级子项失败:', error);
+    localItems.value = [];
+  } finally {
+    folderLoadingPaths.value.delete(parentPath);
+  }
+}
+
+// 深层文件夹在已展开且空列表时补拉一次，避免拖拽后出现空白
+watch(
+  () => props.items,
+  () => {
+    void ensureCurrentLevelItemsLoaded();
+  },
+  { immediate: true },
+);
+
 // 切换文件夹展开状态
-const toggleExpand = (note: NoteItem, event?: MouseEvent) => {
+const toggleExpand = async (note: NoteItem, event?: MouseEvent) => {
   if (!note.isFolder) return;
   event?.stopPropagation();
 
+  // 先切换展开状态，保证点击后有即时反馈
   if (expandedFolders.value.has(note.path)) {
     expandedFolders.value.delete(note.path);
-  } else {
-    expandedFolders.value.add(note.path);
+    return;
   }
+
+  expandedFolders.value.add(note.path);
+  await ensureFolderChildrenLoaded(note);
 };
 
 // 判断文件夹是否展开
@@ -315,6 +384,10 @@ const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
   // 检查是否已经在目标文件夹内
   const originalParent = getParentPath(draggingItem.path);
   if (originalParent === folder.path) return;
+
+  // 拖入后自动展开目标文件夹，保持和当前交互预期一致
+  expandedFolders.value.add(folder.path);
+  void ensureFolderChildrenLoaded(folder);
 
   // 触发移动事件
   emit('move', draggingItem, folder.path);
