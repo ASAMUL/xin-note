@@ -59,15 +59,15 @@ export function parseAiBaseUrl(input?: string | null): ParsedAiBaseUrl {
 
 /**
  * OpenAI / OpenAI-compatible 请求所需的 baseURL。
- * - 默认会自动追加 /v1（除非用户在末尾添加 #）
- * - 若用户已填到 /v1，则不会重复追加
+ * - 默认会自动追加 /api/v1（除非用户在末尾添加 #）
+ * - 若用户已填到 /api/v1，则不会重复追加
  */
 export function toOpenAiRequestBaseUrl(input?: string | null): string {
   const { baseURL, disableAutoAppendV1 } = parseAiBaseUrl(input);
   if (!baseURL) return '';
   if (disableAutoAppendV1) return baseURL;
-  if (/\/v1$/i.test(baseURL)) return baseURL;
-  return `${baseURL}/v1`;
+  if (/\/api\/v1$/i.test(baseURL)) return baseURL;
+  return `${baseURL}/api/v1`;
 }
 
 export function toOpenAiChatCompletionsUrl(input?: string | null): string {
