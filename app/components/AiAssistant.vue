@@ -1,6 +1,11 @@
-<script setup lang="ts">
-import type { UIMessage } from 'ai';
+﻿<script setup lang="ts">
 import type { PromptInputMessage } from '~/components/ai-elements/prompt-input';
+import type {
+  AiAssistantMessage,
+  AiAssistantMessageMeta,
+  AiAssistantRagSource,
+  AiAssistantSession,
+} from '~/types/ai-assistant';
 
 import {
   Conversation,
@@ -18,30 +23,122 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from '~/components/ai-elements/prompt-input';
+import {
+  Queue,
+  QueueItem,
+  QueueItemAction,
+  QueueItemActions,
+  QueueList,
+  QueueSection,
+  QueueSectionContent,
+  QueueSectionLabel,
+  QueueSectionTrigger,
+} from '~/components/ai-elements/queue';
+import { Reasoning, ReasoningContent, ReasoningTrigger } from '~/components/ai-elements/reasoning';
+import { Sources, SourcesContent, SourcesTrigger } from '~/components/ai-elements/sources';
 import { Suggestion, Suggestions } from '~/components/ai-elements/suggestion';
 
 import { useAiAssistantChat } from '~/composables/ai/useAiAssistantChat';
 
-const { resolved, messages, status, error, sendMessage, abort, clear } = useAiAssistantChat();
+const {
+  resolved,
+  messages,
+  groupedSessions,
+  sessionCount,
+  activeSessionId,
+  activeSessionTitle,
+  status,
+  isBusy,
+  sendMessage,
+  abort,
+  clear,
+  createSession,
+  switchSession,
+  deleteSession,
+} = useAiAssistantChat();
+
+const historyOpen = ref(false);
 
 const quickSuggestions = [
-  '帮我把这一段润色得更自然一点',
-  '基于我正在写的内容，给我 3 个续写灵感',
-  '把下面内容提炼成要点清单',
+  '帮我把这段内容润色得更自然一些。',
+  '基于我正在写的内容，给我 3 个续写灵感。',
+  '把下面内容提炼成要点清单。',
 ];
 
-const isBusy = computed(() => status.value === 'submitted' || status.value === 'streaming');
-
-const getMessageText = (msg: UIMessage) => {
-  const parts = Array.isArray(msg.parts) ? msg.parts : [];
+const getMessageText = (message: AiAssistantMessage) => {
+  const parts = Array.isArray(message.parts) ? message.parts : [];
   return parts
-    .filter((p: any) => p?.type === 'text')
-    .map((p: any) => p.text || '')
+    .filter((part: any) => part?.type === 'text')
+    .map((part: any) => part.text || '')
     .join('');
+};
+
+const getReasoningText = (message: AiAssistantMessage) => {
+  const parts = Array.isArray(message.parts) ? message.parts : [];
+  return parts
+    .filter((part: any) => part?.type === 'reasoning')
+    .map((part: any) => part.text || '')
+    .join('');
+};
+
+const getMessageSources = (message: AiAssistantMessage): AiAssistantRagSource[] => {
+  const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
+  return Array.isArray(metadata.ragSources) ? metadata.ragSources : [];
+};
+
+const getRagWarning = (message: AiAssistantMessage) => {
+  const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
+  return typeof metadata.ragWarning === 'string' ? metadata.ragWarning : '';
+};
+
+const isMessageStreaming = (message: AiAssistantMessage) => {
+  const parts = Array.isArray(message.parts) ? message.parts : [];
+  return parts.some(
+    (part: any) =>
+      (part?.type === 'text' || part?.type === 'reasoning') && part?.state === 'streaming',
+  );
+};
+
+const getSessionPreview = (session: AiAssistantSession) => {
+  const firstUserMessage = session.messages.find((message) => message.role === 'user');
+  if (!firstUserMessage) {
+    return '还没有消息';
+  }
+
+  const text = getMessageText(firstUserMessage).replace(/\s+/g, ' ').trim();
+  if (!text) {
+    return '图片或附件会话';
+  }
+
+  return text.length > 36 ? `${text.slice(0, 36)}...` : text;
+};
+
+const formatSessionTime = (session: AiAssistantSession) => {
+  const date = new Date(session.updatedAt);
+  if (Number.isNaN(date.getTime())) return '--';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 };
 
 const handleSubmit = async (payload: PromptInputMessage) => {
   await sendMessage(payload);
+};
+
+const handleCreateSession = async () => {
+  await createSession();
+};
+
+const handleSwitchSession = async (sessionId: string) => {
+  await switchSession(sessionId);
+  historyOpen.value = false;
+};
+
+const handleDeleteSession = async (sessionId: string) => {
+  await deleteSession(sessionId);
 };
 </script>
 
@@ -54,10 +151,13 @@ const handleSubmit = async (payload: PromptInputMessage) => {
       class="p-4 flex items-center justify-between"
       style="border-bottom: 1px solid var(--border-color)"
     >
-      <div class="flex flex-col gap-0.5">
-        <h2 class="font-semibold leading-tight" style="color: var(--text-main)">ai助理</h2>
+      <div class="flex flex-col gap-0.5 min-w-0">
+        <h2 class="font-semibold leading-tight" style="color: var(--text-main)">AI 助手</h2>
+        <p class="text-xs leading-tight truncate" style="color: var(--text-mute)">
+          当前会话：{{ activeSessionTitle }}
+        </p>
         <p class="text-xs leading-tight" style="color: var(--text-mute)">
-          <span v-if="!resolved.isConfigured">请先在设置中配置 AI Key / 模型</span>
+          <span v-if="!resolved.isConfigured">请先在设置中配置 AI Key / Base URL / 模型</span>
         </p>
       </div>
 
@@ -66,9 +166,29 @@ const handleSubmit = async (payload: PromptInputMessage) => {
           size="xs"
           variant="ghost"
           color="neutral"
+          icon="i-lucide-plus"
+          :disabled="isBusy"
+          title="新建会话"
+          @click="handleCreateSession"
+        />
+
+        <UButton
+          size="xs"
+          variant="ghost"
+          color="neutral"
+          icon="i-lucide-history"
+          :disabled="sessionCount === 0"
+          title="历史会话"
+          @click="historyOpen = true"
+        />
+
+        <UButton
+          size="xs"
+          variant="ghost"
+          color="neutral"
           icon="i-lucide-trash-2"
           :disabled="messages.length === 0 || isBusy"
-          title="清空对话"
+          title="清空当前会话"
           @click="clear"
         />
       </div>
@@ -83,8 +203,8 @@ const handleSubmit = async (payload: PromptInputMessage) => {
             :title="resolved.isConfigured ? '我能帮你做什么？' : 'AI 未配置'"
             :description="
               resolved.isConfigured
-                ? '你可以提问、让它润色、总结、生成续写灵感'
-                : resolved.warnings[0] || '请在右上角设置里填写 Key / Model'
+                ? '你可以提问、润色、总结，或者让 AI 帮你继续写作。'
+                : resolved.warnings[0] || '请在设置中填写 Key / Base URL / 模型'
             "
           >
             <template #default>
@@ -92,10 +212,10 @@ const handleSubmit = async (payload: PromptInputMessage) => {
                 <div class="text-xs" style="color: var(--text-mute)">试试这些快捷指令：</div>
                 <Suggestions class="justify-center">
                   <Suggestion
-                    v-for="s in quickSuggestions"
-                    :key="s"
-                    :suggestion="s"
-                    @click="sendMessage({ text: s, files: [] })"
+                    v-for="suggestion in quickSuggestions"
+                    :key="suggestion"
+                    :suggestion="suggestion"
+                    @click="sendMessage({ text: suggestion, files: [] })"
                   />
                 </Suggestions>
               </div>
@@ -104,19 +224,63 @@ const handleSubmit = async (payload: PromptInputMessage) => {
         </template>
 
         <ConversationContent v-else class="pb-6">
-          <Message v-for="m in messages" :key="m.id" :from="m.role">
+          <Message v-for="message in messages" :key="message.id" :from="message.role">
             <MessageContent class="max-w-full">
-              <template v-if="m.role === 'assistant'">
-                <MessageResponse :content="getMessageText(m)" />
+              <template v-if="message.role === 'assistant'">
+                <Reasoning
+                  v-if="getReasoningText(message)"
+                  class="mb-2"
+                  :is-streaming="isMessageStreaming(message)"
+                  :default-open="true"
+                >
+                  <ReasoningTrigger />
+                  <ReasoningContent :content="getReasoningText(message)" />
+                </Reasoning>
+
+                <MessageResponse :content="getMessageText(message)" />
+
+                <Sources v-if="getMessageSources(message).length > 0" class="mt-3">
+                  <SourcesTrigger :count="getMessageSources(message).length">
+                    <span>引用来源（{{ getMessageSources(message).length }}）</span>
+                  </SourcesTrigger>
+
+                  <SourcesContent class="w-full">
+                    <div
+                      v-for="source in getMessageSources(message)"
+                      :key="`${source.docId}-${source.chunkId}`"
+                      class="rounded-md px-2 py-1.5"
+                      style="
+                        background-color: var(--bg-main);
+                        border: 1px solid var(--border-color);
+                      "
+                    >
+                      <div class="text-xs font-medium" style="color: var(--text-main)">
+                        {{ source.fileName }}
+                      </div>
+                      <div class="text-[11px] mt-1 whitespace-pre-wrap" style="color: var(--text-mute)">
+                        {{ source.snippet }}
+                      </div>
+                    </div>
+                  </SourcesContent>
+                </Sources>
+
+                <div
+                  v-if="getRagWarning(message)"
+                  class="text-xs mt-2 whitespace-pre-wrap"
+                  style="color: var(--text-mute)"
+                >
+                  {{ getRagWarning(message) }}
+                </div>
               </template>
+
               <template v-else>
-                <div class="whitespace-pre-wrap wrap-break-word">
-                  {{ getMessageText(m) }}
+                <div class="whitespace-pre-wrap break-words">
+                  {{ getMessageText(message) }}
                 </div>
               </template>
 
               <div
-                v-if="m.role === 'assistant' && status === 'streaming'"
+                v-if="message.role === 'assistant' && isMessageStreaming(message)"
                 class="text-xs mt-2"
                 style="color: var(--text-mute)"
               >
@@ -129,10 +293,6 @@ const handleSubmit = async (payload: PromptInputMessage) => {
     </div>
 
     <div class="p-4" style="border-top: 1px solid var(--border-color)">
-      <div v-if="error" class="text-xs mb-2" style="color: var(--color-error)">
-        {{ error }}
-      </div>
-
       <PromptInput
         :max-files="4"
         accept="image/*"
@@ -174,5 +334,79 @@ const handleSubmit = async (payload: PromptInputMessage) => {
         </PromptInputFooter>
       </PromptInput>
     </div>
+
+    <UModal v-model:open="historyOpen">
+      <template #content>
+        <div class="p-4 w-[560px] max-w-[96vw]">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-semibold" style="color: var(--text-main)">历史会话</h3>
+              <p class="text-xs" style="color: var(--text-mute)">点击可切换会话，右侧可删除会话</p>
+            </div>
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-plus"
+              :disabled="isBusy"
+              @click="handleCreateSession"
+            >
+              新建会话
+            </UButton>
+          </div>
+
+          <Queue>
+            <template v-if="groupedSessions.length === 0">
+              <div class="text-xs px-2 py-3" style="color: var(--text-mute)">暂无历史会话</div>
+            </template>
+
+            <QueueSection v-for="group in groupedSessions" :key="group.key" :default-open="true">
+              <QueueSectionTrigger>
+                <QueueSectionLabel :count="group.sessions.length" :label="group.label" />
+              </QueueSectionTrigger>
+
+              <QueueSectionContent>
+                <QueueList class="max-h-[260px]">
+                  <QueueItem
+                    v-for="session in group.sessions"
+                    :key="session.id"
+                    :class="session.id === activeSessionId ? 'bg-muted' : ''"
+                  >
+                    <div class="flex items-start gap-2">
+                      <button
+                        class="flex-1 min-w-0 text-left"
+                        type="button"
+                        :disabled="isBusy"
+                        @click="handleSwitchSession(session.id)"
+                      >
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-sm truncate" style="color: var(--text-main)">{{ session.title }}</span>
+                          <span class="text-[11px] shrink-0" style="color: var(--text-mute)">
+                            {{ formatSessionTime(session) }}
+                          </span>
+                        </div>
+                        <div class="text-xs mt-1 truncate" style="color: var(--text-mute)">
+                          {{ getSessionPreview(session) }}
+                        </div>
+                      </button>
+
+                      <QueueItemActions>
+                        <QueueItemAction
+                          :disabled="isBusy"
+                          title="删除会话"
+                          @click.stop="handleDeleteSession(session.id)"
+                        >
+                          <UIcon name="i-lucide-trash-2" class="w-3.5 h-3.5" />
+                        </QueueItemAction>
+                      </QueueItemActions>
+                    </div>
+                  </QueueItem>
+                </QueueList>
+              </QueueSectionContent>
+            </QueueSection>
+          </Queue>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

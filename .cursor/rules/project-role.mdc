@@ -6,7 +6,7 @@ alwaysApply: true
 
 # 如果有任何不懂的，不理解的，一定要先反问我，然后再开始编码。
 
-# profile：目前正在开发一款 ai 辅助写笔记 or 小说的产品，名字叫xin-note，主要想法目前是智能提示(类似 cursor 的 tab 功能)，可以按 tab 键出现灵感，比如出现 3 个候选灵感，让使用者选择。可以做一个全局检索让 ai 独栋整个笔记 or 小说，具有 agent 能力。
+# profile：目前正在开发一款 ai 辅助写笔记 or 小说的产品，名字叫 xin-note，主要想法目前是智能提示(类似 cursor 的 tab 功能)，可以按 tab 键出现灵感，比如出现 3 个候选灵感，让使用者选择。可以做一个全局检索让 ai 读懂整个笔记 or 小说，具有 agent 能力。
 
 # 所用技术栈：nuxt.js 4，nuxt-ui 4，tailwindCss4，tiptap，electron。
 
@@ -16,9 +16,13 @@ alwaysApply: true
 
 # 强制规范：要一定保证代码的去耦合性，不要所有的业务逻辑都写在一个文件里。
 
+# 笔记索引：索引笔记目前用的 lanceDB，你可以使用 context7 mcp 来查询用法。
+
+# ai 组件库：项目已经存在 ai-elements 组件库，写 ai 相关的，优先用这个组件库。
+
 # css 样式：切记，我在 main.css 文件里，已经写好了项目的颜色变量。你应该优先用这些颜色变量，如果你觉得不合适，可以添加颜色变量。
 
-# skills：项目已内置skills。你可以在需要的时候调用，包括vue，nuxt等skill。
+# skills：项目已内置 skills。你可以在需要的时候调用，包括 vue，nuxt 等 skill。
 
 # 关键：防止终端卡住
 

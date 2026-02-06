@@ -1,4 +1,4 @@
-import type { IpcMainInvokeEvent } from 'electron';
+﻿import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 
 import type { LanguageModel, UIMessage } from 'ai';
@@ -51,7 +51,6 @@ function parseModelId(raw: string): { provider: SupportedAiProvider; providerMod
     return { provider: 'openai', providerModelId: 'gpt-4o-mini' };
   }
 
-  // 兼容旧值：gpt-4o-mini
   if (!value.includes('/')) {
     return { provider: 'openai', providerModelId: value };
   }
@@ -111,7 +110,7 @@ function buildModelsListUrls(input?: string | null): string[] {
     pushUnique(AI_GATEWAY_MODELS_LIST_URL);
   }
 
-  // 主流约定：baseURL + /models（不拼 /v1/chat/completions）
+  // 主流约定：baseURL + /models
   pushUnique(`${baseURL}/models`);
 
   // 兼容旧实现/部分服务：baseURL/v1/models
@@ -331,13 +330,44 @@ export function setupAiIpc() {
           abortSignal: controller.signal,
         });
 
-        for await (const delta of result.textStream) {
+        for await (const part of result.fullStream) {
           if (controller.signal.aborted) break;
-          sendToRenderer(event, 'ai:chat-stream-delta', { streamId, delta });
+
+          if (part.type === 'text-delta') {
+            sendToRenderer(event, 'ai:chat-stream-delta', {
+              streamId,
+              delta: part.text,
+            });
+            continue;
+          }
+
+          if (part.type === 'reasoning-start') {
+            sendToRenderer(event, 'ai:chat-stream-reasoning-start', {
+              streamId,
+              id: part.id,
+            });
+            continue;
+          }
+
+          if (part.type === 'reasoning-delta') {
+            sendToRenderer(event, 'ai:chat-stream-reasoning-delta', {
+              streamId,
+              id: part.id,
+              delta: part.text,
+            });
+            continue;
+          }
+
+          if (part.type === 'reasoning-end') {
+            sendToRenderer(event, 'ai:chat-stream-reasoning-end', {
+              streamId,
+              id: part.id,
+            });
+          }
         }
         sendToRenderer(event, 'ai:chat-stream-end', { streamId });
       } catch (e) {
-        // AbortError 视为正常结束
+        // AbortError 表示用户主动终止：忽略
         if ((e as any)?.name === 'AbortError') {
           sendToRenderer(event, 'ai:chat-stream-end', { streamId });
           return;
