@@ -20,10 +20,12 @@ const props = withDefaults(
     baseUrl: string;
     apiKey: string | null;
     currentModel?: string;
+    selectedModels?: string[];
   }>(),
   {
     apiKey: null,
     currentModel: undefined,
+    selectedModels: () => [],
   },
 );
 
@@ -42,6 +44,16 @@ const { isLoading, error, models, listModels } = useAiModelsList();
 
 const normalizedBaseUrl = computed(() => (props.baseUrl || '').trim());
 const normalizedCurrentModel = computed(() => (props.currentModel || '').trim());
+const selectedSet = computed(() => {
+  const set = new Set<string>();
+  const list = Array.isArray(props.selectedModels) ? props.selectedModels : [];
+  for (const raw of list) {
+    const id = (raw || '').trim();
+    if (!id) continue;
+    set.add(id);
+  }
+  return set;
+});
 
 const loadModels = async () => {
   const baseURL = normalizedBaseUrl.value;
@@ -156,7 +168,10 @@ const handleSelect = (modelId: string) => {
                 <ModelSelectorName>{{ id }}</ModelSelectorName>
 
                 <UIcon
-                  v-if="normalizedCurrentModel && id === normalizedCurrentModel"
+                  v-if="
+                    (normalizedCurrentModel && id === normalizedCurrentModel) ||
+                    selectedSet.has(id)
+                  "
                   name="i-lucide-check"
                   class="ml-auto size-4"
                   style="color: var(--accent-color)"

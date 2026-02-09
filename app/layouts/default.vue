@@ -43,7 +43,7 @@ onNuxtReady(() => {
         <Transition name="slide-fade-right">
           <aside
             v-if="isAiSidebarOpen && !isZenMode"
-            class="w-80 shrink-0"
+            class="w-100 shrink-0"
             style="border-left: 1px solid var(--border-color)"
           >
             <AiAssistant />

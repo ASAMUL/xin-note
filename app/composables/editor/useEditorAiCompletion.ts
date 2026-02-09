@@ -4,7 +4,7 @@ import type { Editor } from '@tiptap/vue-3';
 
 import type { AiCompletionState } from '~/components/editor/EditorAiCompletionExtension';
 import { AiCompletion } from '~/components/editor/EditorAiCompletionExtension';
-import { useAiGatewayModel } from '~/composables/ai/useAiGatewayModel';
+import { useAiRoleModel } from '~/composables/ai/useAiRoleModel';
 
 /**
  * AppEditor 内的 AI 续写（候选/ghost/定位/下拉）逻辑封装。
@@ -16,7 +16,7 @@ export const useEditorAiCompletion = (params: {
   editorHostRef: Ref<HTMLElement | null>;
 }) => {
   const { editorRef, editorHostRef } = params;
-  const { aiApiKey, aiBaseUrl, aiModel, resolved } = useAiGatewayModel();
+  const { aiApiKey, aiBaseUrl, modelId, resolved } = useAiRoleModel('completion');
 
   /**
    * ========== AI Completion（Tab 触发/接受）==========
@@ -56,7 +56,7 @@ export const useEditorAiCompletion = (params: {
   };
 
   const requestAiSuggestions = async (_editor: any, textBefore: string): Promise<string[]> => {
-    if (!resolved.value.isConfigured) return [];
+    if (!resolved.value.isConfigured || !modelId.value) return [];
     if (!window.ipcRenderer) return [];
 
     aiLoading.value = true;
@@ -65,7 +65,7 @@ export const useEditorAiCompletion = (params: {
         settings: {
           apiKey: aiApiKey.value,
           baseURL: aiBaseUrl.value,
-          model: aiModel.value,
+          model: modelId.value,
         },
         textBefore,
       })) as unknown;
@@ -193,14 +193,17 @@ export const useEditorAiCompletion = (params: {
     const handlers: EditorCustomHandlers = {
       aiSuggest: {
         canExecute: (editor, _cmd) =>
-          resolved.value.isConfigured && !aiLoading.value && editor.state.selection.empty,
+          resolved.value.isConfigured && !!modelId.value && !aiLoading.value && editor.state.selection.empty,
         execute: (editor, _cmd) => {
           triggerAiSuggest(editor);
           return (editor as any).chain();
         },
         isActive: (editor, _cmd) => !!getAiStorage(editor)?.visible,
         isDisabled: (editor, _cmd) =>
-          !resolved.value.isConfigured || aiLoading.value || !editor.state.selection.empty,
+          !resolved.value.isConfigured ||
+          !modelId.value ||
+          aiLoading.value ||
+          !editor.state.selection.empty,
       },
     };
 
@@ -228,6 +231,7 @@ export const useEditorAiCompletion = (params: {
 
   return {
     aiApiKey,
+    aiSuggestEnabled: computed(() => resolved.value.isConfigured && !!modelId.value),
     aiLoading,
     aiState,
     aiAnchor,

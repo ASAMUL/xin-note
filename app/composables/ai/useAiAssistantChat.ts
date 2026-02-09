@@ -1,4 +1,4 @@
-﻿import type { ChatStatus, FileUIPart, UIMessage } from 'ai';
+import type { ChatStatus, FileUIPart, UIMessage } from 'ai';
 
 import { nanoid } from 'nanoid';
 
@@ -11,7 +11,7 @@ import {
   useAiAssistantHistory,
 } from './useAiAssistantHistory';
 import { useAiAssistantRag } from './useAiAssistantRag';
-import { useAiGatewayModel } from './useAiGatewayModel';
+import { useAiRoleModel } from './useAiRoleModel';
 
 function nowIso() {
   return new Date().toISOString();
@@ -22,7 +22,7 @@ function sortSessionsByUpdatedAt(sessions: AiAssistantSession[]) {
 }
 
 export function useAiAssistantChat() {
-  const { aiApiKey, aiBaseUrl, aiModel, resolved } = useAiGatewayModel();
+  const { aiApiKey, aiBaseUrl, modelId, resolved } = useAiRoleModel('chat');
   const { searchNotes } = useAiAssistantRag();
   const { loadState, scheduleSave, flushSave, groupSessionsByDate } = useAiAssistantHistory();
 
@@ -67,6 +67,7 @@ export function useAiAssistantChat() {
     if (index < 0) return false;
 
     const current = sessions.value[index];
+    if (!current) return false;
     const next = updater(current);
 
     const nextSessions = [...sessions.value];
@@ -573,11 +574,11 @@ export function useAiAssistantChat() {
     activeSessionId.value = sessionId;
     error.value = null;
 
-    if (!resolved.value.isConfigured) {
+    if (!resolved.value.isConfigured || !modelId.value) {
       applyAssistantError(
         sessionId,
         assistantId,
-        resolved.value.warnings[0] || '请先在设置中配置 API Key、Base URL 与模型。',
+        resolved.value.warnings[0] || '请先在设置中配置 API Key、Base URL，并启用/选择聊天模型。',
       );
       await flushSave({ sessions: sessions.value, activeSessionId: activeSessionId.value });
       return;
@@ -614,7 +615,7 @@ export function useAiAssistantChat() {
         settings: {
           apiKey: aiApiKey.value,
           baseURL: aiBaseUrl.value,
-          model: aiModel.value,
+          model: modelId.value,
         },
         messages: historyForIpc,
         system: composeSystemPrompt(ragResult.contextText),

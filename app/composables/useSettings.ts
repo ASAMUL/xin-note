@@ -5,6 +5,11 @@
 
 import { parseAiBaseUrl } from '~/utils/ai/baseUrl';
 
+export interface AiModelPoolItem {
+  id: string;
+  enabled: boolean;
+}
+
 export interface AppSettings {
   notesDirectory: string | null; // 笔记存储目录
   autoSaveDelay: number; // 自动保存延迟（毫秒）
@@ -15,10 +20,33 @@ export interface AppSettings {
    */
   aiApiKey: string | null;
   aiBaseUrl: string;
-  aiModel: string;
+  /**
+   * 模型池：通过“管理”添加模型，并可对每个模型启用/禁用。
+   * - role 模型只能从 enabled 的模型中选择
+   */
+  aiModelsPool: AiModelPoolItem[];
+  /**
+   * 三种“角色模型”：分别用于不同场景的调用。
+   * - chat：聊天/助手
+   * - fast：快速（预留给未来轻量调用）
+   * - completion：编辑器 Tab 补全/续写
+   */
+  aiChatModelId: string | null;
+  aiFastModelId: string | null;
+  aiCompletionModelId: string | null;
 }
 
 const CONFIG_FILE = 'settings.json';
+
+const DEFAULT_AI_MODEL = 'openai/gpt-4o-mini';
+
+function cloneDefaultSettings(): AppSettings {
+  return {
+    ...defaultSettings,
+    // 避免默认值中的数组/对象被意外共享引用
+    aiModelsPool: defaultSettings.aiModelsPool.map((m) => ({ ...m })),
+  };
+}
 
 // 默认设置
 const defaultSettings: AppSettings = {
@@ -28,13 +56,15 @@ const defaultSettings: AppSettings = {
   aiApiKey: null,
   // 用户通常只需要填写「Base URL」本体；请求时会自动追加 /v1（末尾加 # 可禁用）
   aiBaseUrl: 'https://api.openai.com',
-  // 推荐使用 provider/model 形式（更容易兼容多家供应商）
-  aiModel: 'openai/gpt-4o-mini',
+  aiModelsPool: [{ id: DEFAULT_AI_MODEL, enabled: true }],
+  aiChatModelId: DEFAULT_AI_MODEL,
+  aiFastModelId: DEFAULT_AI_MODEL,
+  aiCompletionModelId: DEFAULT_AI_MODEL,
 };
 
 export function useSettings() {
   // 设置状态
-  const settings = useState<AppSettings>('app-settings', () => ({ ...defaultSettings }));
+  const settings = useState<AppSettings>('app-settings', () => cloneDefaultSettings());
 
   // 初始化状态也使用 useState 确保全局唯一
   const isInitialized = useState<boolean>('settings-initialized', () => false);
@@ -50,8 +80,20 @@ export function useSettings() {
     try {
       const data = await window.ipcRenderer.invoke('config-read', CONFIG_FILE);
       if (data) {
-        // 使用整体替换确保响应式更新
-        settings.value = { ...defaultSettings, ...data };
+        const base = cloneDefaultSettings();
+        const merged = { ...base, ...(data as any) } as AppSettings;
+
+        // 简单防御：确保 aiModelsPool 是数组
+        if (!Array.isArray((merged as any).aiModelsPool)) {
+          merged.aiModelsPool = base.aiModelsPool;
+        }
+
+        // 清理已废弃字段（不做旧版本兼容）
+        delete (merged as any).aiModel;
+
+        settings.value = merged;
+      } else {
+        settings.value = cloneDefaultSettings();
       }
       isInitialized.value = true;
     } catch (error) {
@@ -79,6 +121,13 @@ export function useSettings() {
       console.error('保存设置失败:', error);
       return false;
     }
+  };
+
+  // 批量 patch（一次写盘），给更复杂的设置场景使用（例如 AI 模型池）
+  const patchSettings = async (patch: Partial<AppSettings>) => {
+    const next = { ...settings.value, ...patch };
+    settings.value = next;
+    await saveSettings(next);
   };
 
   // 更新笔记目录
@@ -143,17 +192,9 @@ export function useSettings() {
     await saveSettings(newSettings);
   };
 
-  // 更新 AI Model
-  const setAiModel = async (model: string) => {
-    const normalized = model.trim();
-    const newSettings = { ...settings.value, aiModel: normalized || defaultSettings.aiModel };
-    settings.value = newSettings;
-    await saveSettings(newSettings);
-  };
-
   // 重置设置
   const resetSettings = async () => {
-    const newSettings = { ...defaultSettings };
+    const newSettings = cloneDefaultSettings();
     settings.value = newSettings;
     await saveSettings(newSettings);
   };
@@ -169,16 +210,19 @@ export function useSettings() {
     theme: computed(() => settings.value.theme),
     aiApiKey: computed(() => settings.value.aiApiKey),
     aiBaseUrl: computed(() => settings.value.aiBaseUrl),
-    aiModel: computed(() => settings.value.aiModel),
+    aiModelsPool: computed(() => settings.value.aiModelsPool),
+    aiChatModelId: computed(() => settings.value.aiChatModelId),
+    aiFastModelId: computed(() => settings.value.aiFastModelId),
+    aiCompletionModelId: computed(() => settings.value.aiCompletionModelId),
     isInitialized: computed(() => isInitialized.value),
     loadSettings,
+    patchSettings,
     setNotesDirectory,
     selectNotesDirectory,
     setAutoSaveDelay,
     setTheme,
     setAiApiKey,
     setAiBaseUrl,
-    setAiModel,
     resetSettings,
   };
 }

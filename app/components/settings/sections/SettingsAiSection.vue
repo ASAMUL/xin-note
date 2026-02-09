@@ -5,18 +5,33 @@
  */
 
 import AiModelManagerDialog from '../ai/AiModelManagerDialog.vue';
+import AiModelsPoolCard from '../ai/AiModelsPoolCard.vue';
+import AiRoleModelsCard from '../ai/AiRoleModelsCard.vue';
 import { parseAiBaseUrl, toModelsListUrl, toOpenAiChatCompletionsUrl } from '~/utils/ai/baseUrl';
+import { useAiModelPoolSettings } from '~/composables/ai/useAiModelPoolSettings';
 
 const props = defineProps<{ open?: boolean }>();
 
-const { aiApiKey, aiBaseUrl, aiModel, setAiApiKey, setAiBaseUrl, setAiModel } = useSettings();
+const { aiApiKey, aiBaseUrl, setAiApiKey, setAiBaseUrl } = useSettings();
+
+const {
+  pool,
+  poolModelIds,
+  enabledModelIds,
+  aiChatModelId,
+  aiFastModelId,
+  aiCompletionModelId,
+  addToPool,
+  setEnabled,
+  removeFromPool,
+  setRoleModel,
+} = useAiModelPoolSettings();
 
 const toast = useToast();
 
 // 用草稿值编辑，点击保存后写入 settings.json
 const aiKeyDraft = ref('');
 const aiBaseUrlDraft = ref('');
-const aiModelDraft = ref('');
 const showAiKey = ref(false);
 const isSaving = ref(false);
 const showModelManager = ref(false);
@@ -32,7 +47,6 @@ watch(
     if (!open) return;
     aiKeyDraft.value = aiApiKey.value || '';
     aiBaseUrlDraft.value = aiBaseUrl.value || 'https://api.openai.com';
-    aiModelDraft.value = aiModel.value || 'openai/gpt-4o-mini';
   },
   { immediate: true },
 );
@@ -42,7 +56,6 @@ const saveAiSettings = async () => {
   isSaving.value = true;
   try {
     await setAiBaseUrl(aiBaseUrlDraft.value);
-    await setAiModel(aiModelDraft.value);
     await setAiApiKey(aiKeyDraft.value);
     toast.add({ title: 'AI 设置已保存', color: 'primary' });
   } catch (e) {
@@ -53,9 +66,31 @@ const saveAiSettings = async () => {
   }
 };
 
-const handleModelSelect = (modelId: string) => {
-  aiModelDraft.value = modelId;
-  toast.add({ title: '已选择模型', description: modelId, color: 'primary' });
+const handleModelSelect = async (modelId: string) => {
+  const ok = await addToPool(modelId);
+  if (!ok) {
+    toast.add({ title: '添加模型失败', description: modelId, color: 'error' });
+    return;
+  }
+  toast.add({ title: '已添加到模型池', description: modelId, color: 'primary' });
+};
+
+const handleToggleModel = async (modelId: string, enabled: boolean) => {
+  await setEnabled(modelId, enabled);
+};
+
+const handleRemoveModel = async (modelId: string) => {
+  await removeFromPool(modelId);
+};
+
+const handleRoleSelect = async (
+  role: 'chat' | 'fast' | 'completion',
+  modelId: string | null,
+) => {
+  const ok = await setRoleModel(role, modelId);
+  if (!ok) {
+    toast.add({ title: '选择失败：模型未启用', color: 'neutral' });
+  }
 };
 </script>
 
@@ -64,7 +99,7 @@ const handleModelSelect = (modelId: string) => {
     <div class="space-y-1">
       <h4 class="text-sm font-semibold" style="color: var(--text-main)">AI 配置</h4>
       <p class="text-xs" style="color: var(--text-mute)">
-        配置 API Key、Base URL 与默认模型（仅保存在本地 settings.json）
+        配置 API Key、Base URL、模型池与角色模型（仅保存在本地 settings.json）
       </p>
     </div>
 
@@ -99,25 +134,6 @@ const handleModelSelect = (modelId: string) => {
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
-        <UInput
-          v-model="aiModelDraft"
-          size="sm"
-          icon="i-lucide-box"
-          class="flex-1"
-          placeholder="模型（例如 openai/gpt-4o-mini / anthropic/claude-3-5-haiku-latest / google/gemini-2.0-flash / openai-compatible/google/gemini-3-flash-preview）"
-        />
-        <UButton
-          variant="soft"
-          color="neutral"
-          size="sm"
-          icon="i-lucide-settings-2"
-          @click="showModelManager = true"
-        >
-          管理
-        </UButton>
-      </div>
-
       <UInput
         v-model="aiKeyDraft"
         size="sm"
@@ -149,13 +165,36 @@ const handleModelSelect = (modelId: string) => {
         </UButton>
       </div>
     </div>
+
+    <AiModelsPoolCard :models="pool" @toggle="handleToggleModel" @remove="handleRemoveModel">
+      <template #actions>
+        <UButton
+          variant="soft"
+          color="neutral"
+          size="sm"
+          icon="i-lucide-settings-2"
+          @click="showModelManager = true"
+        >
+          管理
+        </UButton>
+      </template>
+    </AiModelsPoolCard>
+
+    <AiRoleModelsCard
+      :enabled-model-ids="enabledModelIds"
+      :chat-model-id="aiChatModelId"
+      :fast-model-id="aiFastModelId"
+      :completion-model-id="aiCompletionModelId"
+      @select="handleRoleSelect"
+    />
   </div>
 
   <AiModelManagerDialog
     v-model:open="showModelManager"
     :base-url="aiBaseUrlDraft"
     :api-key="draftApiKey"
-    :current-model="aiModelDraft"
+    :current-model="aiChatModelId || undefined"
+    :selected-models="poolModelIds"
     @select="handleModelSelect"
   />
 </template>

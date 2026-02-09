@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import type { PromptInputMessage } from '~/components/ai-elements/prompt-input';
 import type {
   AiAssistantMessage,
@@ -46,6 +46,7 @@ import {
 import { Sources, SourcesContent, SourcesTrigger } from '~/components/ai-elements/sources';
 import { Suggestion, Suggestions } from '~/components/ai-elements/suggestion';
 
+import AiAssistantChatModelPicker from '~/components/ai-assistant/AiAssistantChatModelPicker.vue';
 import { useAiAssistantChat } from '~/composables/ai/useAiAssistantChat';
 
 const {
@@ -618,6 +619,7 @@ const handleDeleteSession = async (sessionId: string) => {
 
         <PromptInputFooter>
           <div class="flex items-center gap-2">
+            <AiAssistantChatModelPicker :disabled="isBusy" />
             <UButton
               v-if="status === 'streaming'"
               size="xs"

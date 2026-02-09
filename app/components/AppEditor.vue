@@ -37,7 +37,7 @@ const { resolveLocalImageSrc, fileHandlerExtension, imageHandlers } = useEditorL
 
 // AI 续写（候选/定位/handlers + extension）
 const {
-  aiApiKey,
+  aiSuggestEnabled,
   aiLoading,
   aiState,
   aiAnchor,
@@ -61,7 +61,7 @@ const customHandlers = computed(() => {
 
 // Drag handle 右键菜单：复用 Nuxt UI 的 mapEditorItems，自动绑定 handler
 const { selectedNode, dragHandleMenuItems } = useEditorDragHandleMenu(customHandlers);
-const { toolbarItems } = useEditorToolBar({ aiApiKey, aiLoading });
+const { toolbarItems } = useEditorToolBar({ aiSuggestEnabled, aiLoading });
 const suggestionItems = computed(() => {
   return [
     [
