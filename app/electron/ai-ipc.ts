@@ -1,4 +1,4 @@
-﻿import type { IpcMainInvokeEvent } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 
 import type { LanguageModel, UIMessage } from 'ai';
@@ -22,6 +22,13 @@ export interface AiRuntimeSettings {
   apiKey: string | null;
   baseURL?: string | null;
   model: string;
+  /**
+   * 高级：是否请求/返回“推理(Reasoning)”内容。
+   *
+   * 说明：不同 OpenAI-compatible 提供商对 reasoning 的参数与返回字段不完全一致；
+   * 这里提供一个可选开关，默认走 'auto'（仅对已识别的提供商启用，不写死到某一家）。
+   */
+  reasoning?: 'auto' | boolean;
 }
 
 export interface AiEditorSuggestRequest {
@@ -165,21 +172,21 @@ function resolveLanguageModel(settings: AiRuntimeSettings): LanguageModel {
   const openAiRequestBaseURL = toOpenAiRequestBaseUrl(settings.baseURL);
   const parsed = parseModelId(settings.model);
 
-  // 兼容 OpenRouter：用户可能会填 model=google/... 但 baseURL 指向 openrouter
-  // - OpenRouter 是 OpenAI-compatible API，应该走 openai-compatible provider
-  if (
-    baseURL &&
-    isOpenRouterBaseUrl(baseURL) &&
-    (parsed.provider === 'openai' ||
-      parsed.provider === 'anthropic' ||
-      parsed.provider === 'google')
-  ) {
+  // 兼容 OpenRouter（OpenAI-compatible 聚合）：
+  // - 若 baseURL 指向 openrouter，则统一走 openai-compatible provider（Authorization: Bearer）
+  // - 用户 model 可能是 google/... / anthropic/... / openai/... 或 openai-compatible/<provider>/<model>
+  if (baseURL && isOpenRouterBaseUrl(baseURL) && parsed.provider !== 'gateway') {
     const provider = createOpenAICompatible({
       name: 'openrouter',
       baseURL: openAiRequestBaseURL || baseURL,
       apiKey,
     });
-    const openrouterModelId = `${parsed.provider}/${parsed.providerModelId}`;
+
+    const openrouterModelId =
+      parsed.provider === 'openai-compatible'
+        ? parsed.providerModelId
+        : `${parsed.provider}/${parsed.providerModelId}`;
+
     return provider.chatModel(openrouterModelId) as unknown as LanguageModel;
   }
 
@@ -212,7 +219,8 @@ function resolveLanguageModel(settings: AiRuntimeSettings): LanguageModel {
       throw new Error('openai-compatible 需要配置 Base URL');
     }
     const provider = createOpenAICompatible({
-      name: 'openai-compatible',
+      // 使用 camelCase name，便于 providerOptions 透传（避免 kebab-case 的兼容警告）
+      name: 'openaiCompatible',
       baseURL: openAiRequestBaseURL || baseURL,
       apiKey,
     });
@@ -314,6 +322,54 @@ export function setupAiIpc() {
   // 侧边栏：启动流式生成
   ipcMain.handle('ai:chat-stream-start', async (event, req: AiChatStreamStartRequest) => {
     const model = resolveLanguageModel(req.settings);
+    const baseURL = parseAiBaseUrl(req.settings?.baseURL).baseURL;
+    const parsedModel = parseModelId(req.settings?.model || '');
+
+    const openAiCompatibleProviderName =
+      baseURL && isOpenRouterBaseUrl(baseURL) && parsedModel.provider !== 'gateway'
+        ? 'openrouter'
+        : parsedModel.provider === 'openai-compatible'
+          ? 'openaiCompatible'
+          : null;
+
+    // ====== Reasoning（推理内容）请求策略 ======
+    // 注意：不要对所有 OpenAI-compatible 一刀切地注入 OpenRouter 的参数（很多服务会直接 400）。
+    // 这里只在“已识别的 OpenRouter”上默认开启；其余服务保持不变（除非未来 UI 显式透传）。
+    const reasoningToggle = req.settings?.reasoning ?? 'auto';
+    const shouldRequestReasoning =
+      reasoningToggle === true ||
+      (reasoningToggle === 'auto' &&
+        parsedModel.provider !== 'gateway' &&
+        !!baseURL &&
+        isOpenRouterBaseUrl(baseURL));
+
+    const providerOptions: Record<string, any> | undefined = shouldRequestReasoning
+      ? (() => {
+          if (openAiCompatibleProviderName === 'openrouter') {
+            return {
+              [openAiCompatibleProviderName]: {
+                // OpenRouter Chat Completions 支持 `reasoning` 对象；enabled=true 使用默认配置（通常为 medium）
+                reasoning: { enabled: true },
+                // 兼容 legacy 参数（OpenRouter 会把它映射为 reasoning 配置）
+                include_reasoning: true,
+              },
+            };
+          }
+
+          // 其它 openai-compatible 提供商：仅当用户显式开启（reasoning=true）时，尝试用 OpenAI-style 的 reasoning_effort。
+          // - 这不是通用标准；部分服务可能不支持并返回 400。
+          // - 之所以不在 auto 下启用，是为了避免“换个兼容服务就报错”。
+          if (openAiCompatibleProviderName === 'openaiCompatible' && reasoningToggle === true) {
+            return {
+              [openAiCompatibleProviderName]: {
+                reasoningEffort: 'medium',
+              },
+            };
+          }
+
+          return undefined;
+        })()
+      : undefined;
 
     const streamId = nanoid();
     const controller = new AbortController();
@@ -322,13 +378,58 @@ export function setupAiIpc() {
     // 后台执行：通过 IPC push delta
     void (async () => {
       try {
-        const modelMessages = await convertToModelMessages(req.messages as any);
+        const modelMessages = await convertToModelMessages(req.messages);
         const result = streamText({
           model,
           system: req.system,
-          messages: modelMessages as any,
+          messages: modelMessages,
           abortSignal: controller.signal,
+          providerOptions,
+          // 开启 raw chunk 以便在部分提供商仅返回 reasoning_details 时做兜底解析
+          includeRawChunks: shouldRequestReasoning && openAiCompatibleProviderName === 'openrouter',
         });
+
+        // 若 SDK 已经产出 reasoning-* chunk，则不再用 raw 兜底，避免重复
+        let sdkReasoningSeen = false;
+        let rawReasoningActive = false;
+        const rawReasoningId = 'reasoning-0';
+
+        const extractReasoningDeltaFromRaw = (rawValue: unknown): string => {
+          try {
+            const delta: any = (rawValue as any)?.choices?.[0]?.delta;
+            if (!delta || typeof delta !== 'object') return '';
+
+            // OpenRouter 可能返回结构化 reasoning_details（AI SDK 目前不会解析这个字段）
+            const details = delta.reasoning_details;
+            if (Array.isArray(details) && details.length > 0) {
+              const out: string[] = [];
+              for (const item of details) {
+                if (!item || typeof item !== 'object') continue;
+
+                // 常见：{ type: "reasoning.text", text: "..." }
+                if (typeof (item as any).text === 'string' && (item as any).text) {
+                  out.push((item as any).text);
+                  continue;
+                }
+
+                // 兼容 summary：可能是 string 或 string[]
+                if (typeof (item as any).summary === 'string' && (item as any).summary) {
+                  out.push((item as any).summary);
+                  continue;
+                }
+                if (Array.isArray((item as any).summary) && (item as any).summary.length > 0) {
+                  out.push(((item as any).summary as any[]).filter((v) => typeof v === 'string').join('\n'));
+                  continue;
+                }
+              }
+              return out.filter(Boolean).join('');
+            }
+
+            return '';
+          } catch {
+            return '';
+          }
+        };
 
         for await (const part of result.fullStream) {
           if (controller.signal.aborted) break;
@@ -342,6 +443,7 @@ export function setupAiIpc() {
           }
 
           if (part.type === 'reasoning-start') {
+            sdkReasoningSeen = true;
             sendToRenderer(event, 'ai:chat-stream-reasoning-start', {
               streamId,
               id: part.id,
@@ -350,6 +452,7 @@ export function setupAiIpc() {
           }
 
           if (part.type === 'reasoning-delta') {
+            sdkReasoningSeen = true;
             sendToRenderer(event, 'ai:chat-stream-reasoning-delta', {
               streamId,
               id: part.id,
@@ -359,11 +462,41 @@ export function setupAiIpc() {
           }
 
           if (part.type === 'reasoning-end') {
+            sdkReasoningSeen = true;
             sendToRenderer(event, 'ai:chat-stream-reasoning-end', {
               streamId,
               id: part.id,
             });
+            continue;
           }
+
+          // raw chunk 兜底：用于解析 reasoning_details（当 SDK 没有产出 reasoning chunk 时）
+          if (part.type === 'raw' && shouldRequestReasoning && !sdkReasoningSeen) {
+            const delta = extractReasoningDeltaFromRaw((part as any).rawValue);
+            if (!delta) continue;
+
+            if (!rawReasoningActive) {
+              rawReasoningActive = true;
+              sendToRenderer(event, 'ai:chat-stream-reasoning-start', {
+                streamId,
+                id: rawReasoningId,
+              });
+            }
+
+            sendToRenderer(event, 'ai:chat-stream-reasoning-delta', {
+              streamId,
+              id: rawReasoningId,
+              delta,
+            });
+          }
+        }
+
+        // 兜底结束（仅 raw reasoning 走这里）
+        if (rawReasoningActive && !sdkReasoningSeen) {
+          sendToRenderer(event, 'ai:chat-stream-reasoning-end', {
+            streamId,
+            id: rawReasoningId,
+          });
         }
         sendToRenderer(event, 'ai:chat-stream-end', { streamId });
       } catch (e) {

@@ -34,7 +34,15 @@ import {
   QueueSectionLabel,
   QueueSectionTrigger,
 } from '~/components/ai-elements/queue';
-import { Reasoning, ReasoningContent, ReasoningTrigger } from '~/components/ai-elements/reasoning';
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtImage,
+  ChainOfThoughtSearchResult,
+  ChainOfThoughtSearchResults,
+  ChainOfThoughtStep,
+} from '~/components/ai-elements/chain-of-thought';
 import { Sources, SourcesContent, SourcesTrigger } from '~/components/ai-elements/sources';
 import { Suggestion, Suggestions } from '~/components/ai-elements/suggestion';
 
@@ -99,6 +107,231 @@ const isMessageStreaming = (message: AiAssistantMessage) => {
   );
 };
 
+
+type ChainOfThoughtStepStatus = 'complete' | 'active' | 'pending';
+
+interface ChainOfThoughtProgressStepData {
+  key: 'retrieval' | 'reasoning' | 'response' | 'completed';
+  label: string;
+  description: string;
+  status: ChainOfThoughtStepStatus;
+}
+
+interface ChainOfThoughtImageData {
+  src: string;
+  caption: string;
+}
+
+interface ChainOfThoughtViewModel {
+  shouldShow: boolean;
+  progressSteps: ChainOfThoughtProgressStepData[];
+  reasoningSteps: string[];
+  searchResults: string[];
+  images: ChainOfThoughtImageData[];
+}
+
+const getMessageParts = (message: AiAssistantMessage): any[] => {
+  return Array.isArray(message.parts) ? (message.parts as any[]) : [];
+};
+
+const toReasoningSteps = (reasoningText: string) => {
+  return reasoningText
+    .split(/\n+/)
+    .map((step) => step.trim())
+    .filter(Boolean);
+};
+
+const isImageMediaType = (mediaType: unknown) => {
+  return typeof mediaType === 'string' && mediaType.startsWith('image/');
+};
+
+const resolveImageSrc = (part: any) => {
+  if (typeof part?.url === 'string' && part.url) {
+    return part.url;
+  }
+
+  if (typeof part?.base64 === 'string' && part.base64 && isImageMediaType(part?.mediaType)) {
+    return `data:${part.mediaType};base64,${part.base64}`;
+  }
+
+  return '';
+};
+
+const getSearchResultTags = (message: AiAssistantMessage): string[] => {
+  const fileNames = getMessageSources(message)
+    .map((source) => (source.fileName || '').trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(fileNames));
+};
+
+const getAssistantImageParts = (message: AiAssistantMessage): ChainOfThoughtImageData[] => {
+  return getMessageParts(message)
+    .map((part: any, index: number) => {
+      if (part?.type === 'file' && isImageMediaType(part?.mediaType)) {
+        const src = resolveImageSrc(part);
+        if (!src) return null;
+
+        return {
+          src,
+          caption: `模型图像 · ${part.filename || `图片 ${index + 1}`}`,
+        };
+      }
+
+      if (part?.type === 'image' || part?.type === 'experimental_generated-image') {
+        const src = resolveImageSrc(part);
+        if (!src) return null;
+
+        return {
+          src,
+          caption: `模型图像 · 图片 ${index + 1}`,
+        };
+      }
+
+      return null;
+    })
+    .filter((item): item is ChainOfThoughtImageData => Boolean(item));
+};
+
+const getNearestUserImageParts = (
+  currentMessages: AiAssistantMessage[],
+  assistantIndex: number,
+): ChainOfThoughtImageData[] => {
+  for (let index = assistantIndex - 1; index >= 0; index -= 1) {
+    const message = currentMessages[index];
+    if (!message || message.role !== 'user') continue;
+
+    return getMessageParts(message)
+      .filter((part: any) => part?.type === 'file' && isImageMediaType(part?.mediaType))
+      .map((part: any, imageIndex: number) => {
+        const src = resolveImageSrc(part);
+        if (!src) return null;
+
+        return {
+          src,
+          caption: `用户上传 · ${part.filename || `图片 ${imageIndex + 1}`}`,
+        };
+      })
+      .filter((item): item is ChainOfThoughtImageData => Boolean(item));
+  }
+
+  return [];
+};
+
+const getProgressSteps = (
+  message: AiAssistantMessage,
+  reasoningSteps: string[],
+): ChainOfThoughtProgressStepData[] => {
+  const parts = getMessageParts(message);
+  const isStreaming = isMessageStreaming(message);
+  const sourceCount = getMessageSources(message).length;
+  const hasReasoning = reasoningSteps.length > 0;
+  const hasText = getMessageText(message).trim().length > 0;
+
+  const reasoningStreaming = parts.some(
+    (part: any) => part?.type === 'reasoning' && part?.state === 'streaming',
+  );
+  const textStreaming = parts.some((part: any) => part?.type === 'text' && part?.state === 'streaming');
+
+  const retrievalStatus: ChainOfThoughtStepStatus =
+    sourceCount > 0 || hasReasoning || hasText || !isStreaming ? 'complete' : 'active';
+  const reasoningStatus: ChainOfThoughtStepStatus = reasoningStreaming
+    ? 'active'
+    : hasReasoning || (!isStreaming && hasText)
+      ? 'complete'
+      : 'pending';
+  const responseStatus: ChainOfThoughtStepStatus = textStreaming
+    ? 'active'
+    : hasText
+      ? 'complete'
+      : 'pending';
+  const completedStatus: ChainOfThoughtStepStatus = !isStreaming && hasText ? 'complete' : 'pending';
+
+  return [
+    {
+      key: 'retrieval',
+      label: '检索上下文',
+      description: sourceCount > 0 ? `命中 ${sourceCount} 条结果` : '未命中检索片段',
+      status: retrievalStatus,
+    },
+    {
+      key: 'reasoning',
+      label: '推理分析',
+      description: hasReasoning ? `已产出 ${reasoningSteps.length} 个步骤` : '等待推理内容',
+      status: reasoningStatus,
+    },
+    {
+      key: 'response',
+      label: '生成回答',
+      description: textStreaming ? '正在生成回答内容' : hasText ? '回答内容已生成' : '等待回答内容',
+      status: responseStatus,
+    },
+    {
+      key: 'completed',
+      label: '完成',
+      description: completedStatus === 'complete' ? '当前轮次已完成' : '等待生成结束',
+      status: completedStatus,
+    },
+  ];
+};
+
+const chainOfThoughtByMessageId = computed<Record<string, ChainOfThoughtViewModel>>(() => {
+  const currentMessages = messages.value;
+  const result: Record<string, ChainOfThoughtViewModel> = {};
+
+  currentMessages.forEach((message, messageIndex) => {
+    if (message.role !== 'assistant') return;
+
+    const reasoningSteps = toReasoningSteps(getReasoningText(message));
+    const searchResults = getSearchResultTags(message);
+
+    const assistantImages = getAssistantImageParts(message);
+    const images = assistantImages.length > 0
+      ? assistantImages
+      : getNearestUserImageParts(currentMessages, messageIndex);
+
+    const progressSteps = getProgressSteps(message, reasoningSteps);
+    const shouldShow =
+      isMessageStreaming(message) ||
+      reasoningSteps.length > 0 ||
+      searchResults.length > 0 ||
+      images.length > 0;
+
+    result[message.id] = {
+      shouldShow,
+      progressSteps,
+      reasoningSteps,
+      searchResults,
+      images,
+    };
+  });
+
+  return result;
+});
+
+const getChainOfThought = (message: AiAssistantMessage) => {
+  return chainOfThoughtByMessageId.value[message.id];
+};
+
+const shouldShowChainOfThought = (message: AiAssistantMessage) => {
+  return Boolean(getChainOfThought(message)?.shouldShow);
+};
+
+const getChainProgressSteps = (message: AiAssistantMessage): ChainOfThoughtProgressStepData[] => {
+  return getChainOfThought(message)?.progressSteps || [];
+};
+
+const getChainSearchResults = (message: AiAssistantMessage): string[] => {
+  return getChainOfThought(message)?.searchResults || [];
+};
+
+const getChainReasoningSteps = (message: AiAssistantMessage): string[] => {
+  return getChainOfThought(message)?.reasoningSteps || [];
+};
+
+const getChainImages = (message: AiAssistantMessage): ChainOfThoughtImageData[] => {
+  return getChainOfThought(message)?.images || [];
+};
 const getSessionPreview = (session: AiAssistantSession) => {
   const firstUserMessage = session.messages.find((message) => message.role === 'user');
   if (!firstUserMessage) {
@@ -227,15 +460,85 @@ const handleDeleteSession = async (sessionId: string) => {
           <Message v-for="message in messages" :key="message.id" :from="message.role">
             <MessageContent class="max-w-full">
               <template v-if="message.role === 'assistant'">
-                <Reasoning
-                  v-if="getReasoningText(message)"
-                  class="mb-2"
-                  :is-streaming="isMessageStreaming(message)"
+                <ChainOfThought
+                  v-if="shouldShowChainOfThought(message)"
+                  class="mb-2 rounded-md px-3 py-2"
                   :default-open="true"
+                  style="background-color: var(--bg-main); border: 1px solid var(--border-color)"
                 >
-                  <ReasoningTrigger />
-                  <ReasoningContent :content="getReasoningText(message)" />
-                </Reasoning>
+                  <ChainOfThoughtHeader class="text-xs" style="color: var(--text-mute)">
+                    思考过程
+                  </ChainOfThoughtHeader>
+
+                  <ChainOfThoughtContent class="space-y-3">
+                    <div class="space-y-2">
+                      <ChainOfThoughtStep
+                        v-for="progressStep in getChainProgressSteps(message)"
+                        :key="progressStep.key"
+                        :label="progressStep.label"
+                        :description="progressStep.description"
+                        :status="progressStep.status"
+                      >
+                        <template #icon>
+                          <UIcon
+                            :name="
+                              progressStep.status === 'complete'
+                                ? 'i-lucide-check'
+                                : progressStep.status === 'active'
+                                  ? 'i-lucide-loader-2'
+                                  : 'i-lucide-circle'
+                            "
+                            class="w-4 h-4"
+                            :class="progressStep.status === 'active' ? 'animate-spin' : ''"
+                          />
+                        </template>
+                      </ChainOfThoughtStep>
+                    </div>
+
+                    <div v-if="getChainSearchResults(message).length > 0" class="space-y-1">
+                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">检索结果</div>
+                      <ChainOfThoughtSearchResults>
+                        <ChainOfThoughtSearchResult
+                          v-for="searchResult in getChainSearchResults(message)"
+                          :key="searchResult"
+                        >
+                          {{ searchResult }}
+                        </ChainOfThoughtSearchResult>
+                      </ChainOfThoughtSearchResults>
+                    </div>
+
+                    <div v-if="getChainReasoningSteps(message).length > 0" class="space-y-2">
+                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">逐步思考</div>
+                      <ChainOfThoughtStep
+                        v-for="(reasoningStep, stepIndex) in getChainReasoningSteps(message)"
+                        :key="`${message.id}-reasoning-${stepIndex}`"
+                        :label="`步骤 ${stepIndex + 1}`"
+                        :description="reasoningStep"
+                        status="complete"
+                      >
+                        <template #icon>
+                          <UIcon name="i-lucide-chevron-right" class="w-4 h-4" />
+                        </template>
+                      </ChainOfThoughtStep>
+                    </div>
+
+                    <div v-if="getChainImages(message).length > 0" class="space-y-2">
+                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">图像</div>
+                      <ChainOfThoughtImage
+                        v-for="(image, imageIndex) in getChainImages(message)"
+                        :key="`${message.id}-image-${imageIndex}`"
+                        :caption="image.caption"
+                      >
+                        <img
+                          :src="image.src"
+                          :alt="image.caption"
+                          class="max-h-56 w-auto rounded-md object-contain"
+                          loading="lazy"
+                        >
+                      </ChainOfThoughtImage>
+                    </div>
+                  </ChainOfThoughtContent>
+                </ChainOfThought>
 
                 <MessageResponse :content="getMessageText(message)" />
 
