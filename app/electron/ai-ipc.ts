@@ -1,4 +1,4 @@
-import type { IpcMainInvokeEvent } from 'electron';
+﻿import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 
 import type { LanguageModel, UIMessage } from 'ai';
@@ -117,12 +117,13 @@ function buildModelsListUrls(input?: string | null): string[] {
     pushUnique(AI_GATEWAY_MODELS_LIST_URL);
   }
 
-  // 主流约定：baseURL + /models
-  pushUnique(`${baseURL}/models`);
-
-  // 兼容旧实现/部分服务：baseURL/v1/models
-  if (!parsed.disableAutoAppendV1 && !/\/v1$/i.test(baseURL)) {
-    pushUnique(`${baseURL}/v1/models`);
+  // 判断 URL 是否已包含 /api/v1，决定如何拼接 models 路径
+  if (/\/api\/v1\/?$/i.test(baseURL) || /\/api\/v1(?=\/|$)/i.test(baseURL)) {
+    // URL 已包含 /api/v1，直接加 /models
+    pushUnique(`${baseURL.replace(/\/$/, '')}/models`);
+  } else {
+    // URL 不包含 /api/v1，在末尾追加 /api/v1/models
+    pushUnique(`${baseURL.replace(/\/$/, '')}/api/v1/models`);
   }
 
   return result;
@@ -329,8 +330,8 @@ export function setupAiIpc() {
       baseURL && isOpenRouterBaseUrl(baseURL) && parsedModel.provider !== 'gateway'
         ? 'openrouter'
         : parsedModel.provider === 'openai-compatible'
-          ? 'openaiCompatible'
-          : null;
+        ? 'openaiCompatible'
+        : null;
 
     // ====== Reasoning（推理内容）请求策略 ======
     // 注意：不要对所有 OpenAI-compatible 一刀切地注入 OpenRouter 的参数（很多服务会直接 400）。
@@ -418,7 +419,11 @@ export function setupAiIpc() {
                   continue;
                 }
                 if (Array.isArray((item as any).summary) && (item as any).summary.length > 0) {
-                  out.push(((item as any).summary as any[]).filter((v) => typeof v === 'string').join('\n'));
+                  out.push(
+                    ((item as any).summary as any[])
+                      .filter((v) => typeof v === 'string')
+                      .join('\n'),
+                  );
                   continue;
                 }
               }
