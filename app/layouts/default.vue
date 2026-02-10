@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import { useAppLocale } from '~/composables/i18n/useAppLocale';
+
 const { isAiSidebarOpen, isLeftSidebarOpen, isZenMode } = useLayoutState();
+
+// 将 settings.json 中的 locale 同步到 i18n（并提供 setLocale 给设置页使用）
+useAppLocale();
 
 // 控制主内容区淡入
 const isAppReady = ref(false);

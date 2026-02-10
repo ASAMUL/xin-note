@@ -1,0 +1,133 @@
+{
+  "app": {
+    "name": "xin-note",
+    "noteDefaultName": "Untitled Note",
+    "noteDefaultCopyName": "Copy"
+  },
+  "common": {
+    "close": "Close",
+    "save": "Save",
+    "manage": "Manage",
+    "toast": {
+      "openFileFailed": "Open file failed",
+      "openFileSuccess": "File opened successfully",
+      "manualSaveSuccess": "Manual save successful",
+      "manualSaveFailed": "Manual save failed"
+    }
+  },
+  "navbar": {
+    "search": {
+      "placeholder": "Search notes..."
+    },
+    "toolbar": {
+      "sync": "Sync",
+      "settings": "Settings"
+    },
+    "file": {
+      "title": "File",
+      "new": "New Note",
+      "folder": "Folder...",
+      "open": "Open File...",
+      "save": "Save",
+      "saveAs": "Save As..."
+    },
+    "edit": {
+      "title": "Edit",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste"
+    },
+    "view": {
+      "title": "View",
+      "fullscreen": "Fullscreen",
+      "zenMode": "Zen Mode",
+      "sidebar": "Sidebar",
+      "aiAssistant": "AI Assistant"
+    },
+    "help": {
+      "title": "Help",
+      "shortcuts": "Shortcuts",
+      "docs": "Docs",
+      "about": "About"
+    },
+    "window": {
+      "minimize": "Minimize",
+      "maximize": "Maximize",
+      "close": "Close",
+      "restore": "Restore",
+      "minimizeToTray": "Minimize to Tray",
+      "closeApplication": "Close Application",
+      "entireCloseApplication": "Entire Close Application",
+      "minimizeApplication": "Minimize Application",
+      "runInBackground": "Run in Background",
+      "rememberChoice": "Remember my choice, next time不再询问"
+    },
+    "toast": {
+      "noEditingFile": "No editing file",
+      "openWorkspaceFolderSuccess": "Workspace folder opened successfully",
+      "unsupportedFileOperation": "Unsupported file operation",
+      "createCopyFailed": "Create copy failed",
+      "createCopySuccess": "Create copy successfully",
+      "openFileFailed": "Open file failed",
+      "openFileSuccess": "Open file successfully",
+      "saveFileFailed": "Save file failed",
+      "saveFileSuccess": "Save file successfully"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "App preferences and AI connection settings",
+    "general": {
+      "title": "General",
+      "description": "Basic preferences such as language and theme",
+      "language": {
+        "title": "Language",
+        "description": "Applies immediately and is saved to local settings.json",
+        "zhCN": "中文",
+        "en": "English"
+      }
+    },
+    "notes": {
+      "title": "Notes",
+      "description": "Configure notes preferences such as storage folder",
+      "directory": {
+        "title": "Notes directory",
+        "unset": "Not set",
+        "change": "Change",
+        "select": "Select",
+        "help": "This folder stores your Markdown notes. If not set, some features will prompt you to choose one."
+      },
+      "toast": {
+        "directoryUpdated": "Notes directory updated"
+      }
+    },
+    "ai": {
+      "title": "AI",
+      "description": "Configure API Key, Base URL, model pool and role models (saved locally to settings.json only)",
+      "connection": {
+        "title": "Connection",
+        "baseUrlPlaceholder": "API Base URL (e.g. https://api.deepseek.com; append # to disable auto /v1)",
+        "apiKeyPlaceholder": "API Key (varies by provider; saved locally to settings.json only)",
+        "previewChat": "Preview (Chat Completions)",
+        "previewModels": "Preview (Models)",
+        "hintPrefix": "Hint",
+        "hintAutoV1Disabled": "Auto-appending /v1 is disabled (because Base URL ends with #)",
+        "hintAutoV1Enabled": "By default /v1 is auto-appended (append # to disable)"
+      },
+      "toast": {
+        "saved": "AI settings saved",
+        "saveFailed": "Save failed, please try again",
+        "addModelFailed": "Failed to add model",
+        "addedToPool": "Added to model pool",
+        "roleModelNotEnabled": "Selection failed: model is not enabled"
+      }
+    },
+    "sections": {
+      "general": "General",
+      "notes": "Notes",
+      "ai": "AI"
+    }
+  }
+}

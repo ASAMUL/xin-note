@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+
+import SettingsGeneralSection from './sections/SettingsGeneralSection.vue';
 import SettingsNotesSection from './sections/SettingsNotesSection.vue';
 import SettingsAiSection from './sections/SettingsAiSection.vue';
 
-type SettingsSectionId = 'notes' | 'ai';
+type SettingsSectionId = 'general' | 'notes' | 'ai';
 
 const props = defineProps<{
   open: boolean;
@@ -17,12 +20,19 @@ const isOpen = computed({
   set: (value) => emit('update:open', value),
 });
 
-const sections = [
-  { id: 'notes' as const, label: '笔记', icon: 'i-lucide-folder' },
-  { id: 'ai' as const, label: 'AI 配置', icon: 'i-lucide-sparkles' },
-];
+const { t, locale } = useI18n();
 
-const active = ref<SettingsSectionId>('notes');
+const sections = computed(() => {
+  // 强制依赖 locale，保证切换语言时 sections 文案更新
+  void locale.value;
+  return [
+    { id: 'general' as const, label: t('settings.sections.general'), icon: 'i-lucide-sliders' },
+    { id: 'notes' as const, label: t('settings.sections.notes'), icon: 'i-lucide-folder' },
+    { id: 'ai' as const, label: t('settings.sections.ai'), icon: 'i-lucide-sparkles' },
+  ];
+});
+
+const active = ref<SettingsSectionId>('general');
 </script>
 
 <template>
@@ -36,13 +46,17 @@ const active = ref<SettingsSectionId>('notes');
               <UIcon name="i-lucide-settings" class="w-5 h-5" />
             </div>
             <div class="flex flex-col">
-              <h3 class="text-base font-semibold" style="color: var(--text-main)">设置</h3>
-              <p class="text-xs" style="color: var(--text-mute)">应用偏好与 AI 连接配置</p>
+              <h3 class="text-base font-semibold" style="color: var(--text-main)">
+                {{ $t('settings.title') }}
+              </h3>
+              <p class="text-xs" style="color: var(--text-mute)">
+                {{ $t('settings.subtitle') }}
+              </p>
             </div>
           </div>
 
           <UButton variant="ghost" color="neutral" icon="i-lucide-x" @click="isOpen = false">
-            关闭
+            {{ $t('common.close') }}
           </UButton>
         </div>
 
@@ -67,7 +81,8 @@ const active = ref<SettingsSectionId>('notes');
 
           <section class="settings-content">
             <div class="settings-content-inner">
-              <SettingsNotesSection v-if="active === 'notes'" :open="isOpen" />
+              <SettingsGeneralSection v-if="active === 'general'" :open="isOpen" />
+              <SettingsNotesSection v-else-if="active === 'notes'" :open="isOpen" />
               <SettingsAiSection v-else :open="isOpen" />
             </div>
           </section>

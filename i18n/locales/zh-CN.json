@@ -1,0 +1,133 @@
+{
+  "app": {
+    "name": "xin-note",
+    "noteDefaultName": "未命名笔记",
+    "noteDefaultCopyName": "副本"
+  },
+  "common": {
+    "close": "关闭",
+    "save": "保存",
+    "manage": "管理",
+    "toast": {
+      "openFileFailed": "打开文件失败",
+      "openFileSuccess": "已打开文件",
+      "manualSaveSuccess": "已手动保存",
+      "manualSaveFailed": "保存失败"
+    }
+  },
+  "navbar": {
+    "search": {
+      "placeholder": "搜索笔记..."
+    },
+    "toolbar": {
+      "sync": "同步",
+      "settings": "设置"
+    },
+    "file": {
+      "title": "文件",
+      "new": "新建笔记",
+      "folder": "文件夹...",
+      "open": "打开文件...",
+      "save": "保存",
+      "saveAs": "另存为..."
+    },
+    "edit": {
+      "title": "编辑",
+      "undo": "撤销",
+      "redo": "重做",
+      "cut": "剪切",
+      "copy": "复制",
+      "paste": "粘贴"
+    },
+    "view": {
+      "title": "视图",
+      "fullscreen": "全屏",
+      "zenMode": "禅模式",
+      "sidebar": "侧边栏",
+      "aiAssistant": "AI 助手"
+    },
+    "help": {
+      "title": "帮助",
+      "shortcuts": "快捷键",
+      "docs": "文档",
+      "about": "关于"
+    },
+    "window": {
+      "minimize": "最小化",
+      "maximize": "最大化",
+      "close": "关闭",
+      "restore": "还原",
+      "minimizeToTray": "最小化到托盘",
+      "closeApplication": "关闭应用",
+      "entireCloseApplication": "完全关闭程序",
+      "minimizeApplication": "最小化应用",
+      "runInBackground": "后台运行",
+      "rememberChoice": "记住我的选择，下次不再询问"
+    },
+    "toast": {
+      "noEditingFile": "没有正在编辑的文件",
+      "openWorkspaceFolderSuccess": "已打开笔记文件夹",
+      "unsupportedFileOperation": "当前环境不支持文件操作",
+      "createCopyFailed": "创建副本失败",
+      "createCopySuccess": "已创建副本",
+      "openFileFailed": "打开文件失败",
+      "openFileSuccess": "已打开文件",
+      "saveFileFailed": "保存文件失败",
+      "saveFileSuccess": "已保存文件"
+    }
+  },
+  "settings": {
+    "title": "设置",
+    "subtitle": "应用偏好与 AI 连接配置",
+    "general": {
+      "title": "通用",
+      "description": "语言、主题等基础偏好设置",
+      "language": {
+        "title": "语言",
+        "description": "切换后立即生效，并会保存在本地 settings.json",
+        "zhCN": "中文",
+        "en": "English"
+      }
+    },
+    "notes": {
+      "title": "笔记",
+      "description": "配置笔记存储目录等偏好",
+      "directory": {
+        "title": "笔记存储目录",
+        "unset": "未设置",
+        "change": "更改",
+        "select": "选择",
+        "help": "该目录用于存放你的 Markdown 笔记；未设置时部分功能会提示你选择目录。"
+      },
+      "toast": {
+        "directoryUpdated": "已更新笔记存储目录"
+      }
+    },
+    "ai": {
+      "title": "AI 配置",
+      "description": "配置 API Key、Base URL、模型池与角色模型（仅保存在本地 settings.json）",
+      "connection": {
+        "title": "连接配置",
+        "baseUrlPlaceholder": "API 地址（Base URL，例如 https://api.deepseek.com；末尾加 # 可禁用自动追加 /v1）",
+        "apiKeyPlaceholder": "API Key（随模型供应商切换；仅保存在本地 settings.json）",
+        "previewChat": "预览（Chat Completions）",
+        "previewModels": "预览（Models）",
+        "hintPrefix": "提示",
+        "hintAutoV1Disabled": "已禁用自动追加 /v1（因为 Base URL 末尾包含 #）",
+        "hintAutoV1Enabled": "默认会自动追加 /v1（末尾加 # 可禁用）"
+      },
+      "toast": {
+        "saved": "AI 设置已保存",
+        "saveFailed": "保存失败，请重试",
+        "addModelFailed": "添加模型失败",
+        "addedToPool": "已添加到模型池",
+        "roleModelNotEnabled": "选择失败：模型未启用"
+      }
+    },
+    "sections": {
+      "general": "通用",
+      "notes": "笔记",
+      "ai": "AI 配置"
+    }
+  }
+}

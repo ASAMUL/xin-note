@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
  * 设置 - 笔记相关
- * 目前仅包含「笔记存储目录」：与原 `AppNavbar.vue` 的设置项一致。
  */
 
 defineProps<{ open?: boolean }>();
@@ -13,7 +12,7 @@ const handleSelectDirectory = async () => {
   const folder = await selectNotesDirectory();
   if (!folder) return;
   toast.add({
-    title: '已更新笔记存储目录',
+    title: $t('settings.notes.toast.directoryUpdated'),
     description: folder,
     color: 'primary',
   });
@@ -23,20 +22,26 @@ const handleSelectDirectory = async () => {
 <template>
   <div class="space-y-4">
     <div class="space-y-1">
-      <h4 class="text-sm font-semibold" style="color: var(--text-main)">笔记</h4>
-      <p class="text-xs" style="color: var(--text-mute)">配置笔记存储目录等偏好</p>
+      <h4 class="text-sm font-semibold" style="color: var(--text-main)">
+        {{ $t('settings.notes.title') }}
+      </h4>
+      <p class="text-xs" style="color: var(--text-mute)">
+        {{ $t('settings.notes.description') }}
+      </p>
     </div>
 
     <div class="section-card">
       <div class="flex items-center gap-2">
         <UIcon name="i-lucide-folder" class="w-4 h-4" />
-        <span class="text-sm font-medium" style="color: var(--text-main)">笔记存储目录</span>
+        <span class="text-sm font-medium" style="color: var(--text-main)">
+          {{ $t('settings.notes.directory.title') }}
+        </span>
       </div>
 
       <div class="mt-3 flex items-center gap-3">
         <div class="path-box">
           <span v-if="notesDirectory">{{ notesDirectory }}</span>
-          <span v-else class="italic">未设置</span>
+          <span v-else class="italic">{{ $t('settings.notes.directory.unset') }}</span>
         </div>
 
         <UButton
@@ -46,12 +51,16 @@ const handleSelectDirectory = async () => {
           icon="i-lucide-folder-open"
           @click="handleSelectDirectory"
         >
-          {{ notesDirectory ? '更改' : '选择' }}
+          {{
+            notesDirectory
+              ? $t('settings.notes.directory.change')
+              : $t('settings.notes.directory.select')
+          }}
         </UButton>
       </div>
 
       <p class="mt-2 text-xs" style="color: var(--text-mute)">
-        该目录用于存放你的 Markdown 笔记；未设置时部分功能会提示你选择目录。
+        {{ $t('settings.notes.directory.help') }}
       </p>
     </div>
   </div>

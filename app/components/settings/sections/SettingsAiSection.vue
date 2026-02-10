@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
  * 设置 - AI 配置
- * 与原 `AppNavbar.vue` 的 AI 设置保持一致，但把 UI 与逻辑独立出来，方便后续扩展（如模型管理弹窗）。
  */
 
 import AiModelManagerDialog from '../ai/AiModelManagerDialog.vue';
@@ -57,10 +56,10 @@ const saveAiSettings = async () => {
   try {
     await setAiBaseUrl(aiBaseUrlDraft.value);
     await setAiApiKey(aiKeyDraft.value);
-    toast.add({ title: 'AI 设置已保存', color: 'primary' });
+    toast.add({ title: $t('settings.ai.toast.saved'), color: 'primary' });
   } catch (e) {
     console.error('保存 AI 设置失败:', e);
-    toast.add({ title: '保存失败，请重试', color: 'error' });
+    toast.add({ title: $t('settings.ai.toast.saveFailed'), color: 'error' });
   } finally {
     isSaving.value = false;
   }
@@ -69,10 +68,14 @@ const saveAiSettings = async () => {
 const handleModelSelect = async (modelId: string) => {
   const ok = await addToPool(modelId);
   if (!ok) {
-    toast.add({ title: '添加模型失败', description: modelId, color: 'error' });
+    toast.add({
+      title: $t('settings.ai.toast.addModelFailed'),
+      description: modelId,
+      color: 'error',
+    });
     return;
   }
-  toast.add({ title: '已添加到模型池', description: modelId, color: 'primary' });
+  toast.add({ title: $t('settings.ai.toast.addedToPool'), description: modelId, color: 'primary' });
 };
 
 const handleToggleModel = async (modelId: string, enabled: boolean) => {
@@ -83,13 +86,10 @@ const handleRemoveModel = async (modelId: string) => {
   await removeFromPool(modelId);
 };
 
-const handleRoleSelect = async (
-  role: 'chat' | 'fast' | 'completion',
-  modelId: string | null,
-) => {
+const handleRoleSelect = async (role: 'chat' | 'fast' | 'completion', modelId: string | null) => {
   const ok = await setRoleModel(role, modelId);
   if (!ok) {
-    toast.add({ title: '选择失败：模型未启用', color: 'neutral' });
+    toast.add({ title: $t('settings.ai.toast.roleModelNotEnabled'), color: 'neutral' });
   }
 };
 </script>
@@ -97,39 +97,43 @@ const handleRoleSelect = async (
 <template>
   <div class="space-y-4">
     <div class="space-y-1">
-      <h4 class="text-sm font-semibold" style="color: var(--text-main)">AI 配置</h4>
+      <h4 class="text-sm font-semibold" style="color: var(--text-main)">
+        {{ $t('settings.ai.title') }}
+      </h4>
       <p class="text-xs" style="color: var(--text-mute)">
-        配置 API Key、Base URL、模型池与角色模型（仅保存在本地 settings.json）
+        {{ $t('settings.ai.description') }}
       </p>
     </div>
 
     <div class="section-card space-y-3">
       <div class="flex items-center gap-2">
         <UIcon name="i-lucide-sparkles" class="w-4 h-4" />
-        <span class="text-sm font-medium" style="color: var(--text-main)">连接配置</span>
+        <span class="text-sm font-medium" style="color: var(--text-main)">
+          {{ $t('settings.ai.connection.title') }}
+        </span>
       </div>
 
       <UInput
         v-model="aiBaseUrlDraft"
         size="sm"
         icon="i-lucide-link"
-        placeholder="API 地址（Base URL，例如 https://api.deepseek.com；末尾加 # 可禁用自动追加 /v1）"
+        :placeholder="$t('settings.ai.connection.baseUrlPlaceholder')"
       />
 
       <div class="-mt-2 space-y-0.5 text-xs">
         <div style="color: var(--text-mute)">
-          预览（Chat Completions）：
+          {{ $t('settings.ai.connection.previewChat') }}：
           <span class="font-mono">{{ previewChatCompletionsUrl || '—' }}</span>
         </div>
         <div style="color: var(--text-mute)">
-          预览（Models）：
+          {{ $t('settings.ai.connection.previewModels') }}：
           <span class="font-mono">{{ previewModelsUrl || '—' }}</span>
         </div>
         <div style="color: var(--text-mute)">
-          提示：{{
+          {{ $t('settings.ai.connection.hintPrefix') }}：{{
             disableAutoV1
-              ? '已禁用自动追加 /v1（因为 Base URL 末尾包含 #）'
-              : '默认会自动追加 /v1（末尾加 # 可禁用）'
+              ? $t('settings.ai.connection.hintAutoV1Disabled')
+              : $t('settings.ai.connection.hintAutoV1Enabled')
           }}
         </div>
       </div>
@@ -139,7 +143,7 @@ const handleRoleSelect = async (
         size="sm"
         :type="showAiKey ? 'text' : 'password'"
         icon="i-lucide-key"
-        placeholder="API Key（随模型供应商切换；仅保存在本地 settings.json）"
+        :placeholder="$t('settings.ai.connection.apiKeyPlaceholder')"
       >
         <template #trailing>
           <UButton
@@ -161,7 +165,7 @@ const handleRoleSelect = async (
           :loading="isSaving"
           @click="saveAiSettings"
         >
-          保存
+          {{ $t('common.save') }}
         </UButton>
       </div>
     </div>
@@ -175,7 +179,7 @@ const handleRoleSelect = async (
           icon="i-lucide-settings-2"
           @click="showModelManager = true"
         >
-          管理
+          {{ $t('common.manage') }}
         </UButton>
       </template>
     </AiModelsPoolCard>

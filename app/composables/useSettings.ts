@@ -15,6 +15,11 @@ export interface AppSettings {
   autoSaveDelay: number; // 自动保存延迟（毫秒）
   theme: 'light' | 'dark' | 'system';
   /**
+   * 应用语言（i18n locale）
+   * - Electron 场景不建议用路由前缀切换语言，因此使用本地 settings.json 持久化
+   */
+  locale: 'zh-CN' | 'en';
+  /**
    * AI 配置（前端直连，用户自行填写 key）
    * 注意：这会写入本地 settings.json（位于 Electron userData 目录）
    */
@@ -53,6 +58,7 @@ const defaultSettings: AppSettings = {
   notesDirectory: null,
   autoSaveDelay: 1500,
   theme: 'system',
+  locale: 'zh-CN',
   aiApiKey: null,
   // 用户通常只需要填写「Base URL」本体；请求时会自动追加 /v1（末尾加 # 可禁用）
   aiBaseUrl: 'https://api.openai.com',
@@ -87,9 +93,6 @@ export function useSettings() {
         if (!Array.isArray((merged as any).aiModelsPool)) {
           merged.aiModelsPool = base.aiModelsPool;
         }
-
-        // 清理已废弃字段（不做旧版本兼容）
-        delete (merged as any).aiModel;
 
         settings.value = merged;
       } else {

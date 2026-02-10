@@ -5,6 +5,8 @@ import DocsDialog from '~/components/dialogs/DocsDialog.vue';
 import AboutDialog from '~/components/dialogs/AboutDialog.vue';
 import SettingsDialog from '~/components/settings/SettingsDialog.vue';
 
+const { t, locale } = useI18n();
+
 // 设置
 const { notesDirectory, selectNotesDirectory } = useSettings();
 const showSettings = ref(false);
@@ -40,14 +42,14 @@ const handleCreateNoteFromMenu = async () => {
     parentDir = p.substring(0, Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/')));
   }
 
-  await createNote('未命名笔记.md', parentDir);
+  await createNote(t('app.noteDefaultName') + '.md', parentDir);
 };
 
 const handleOpenWorkspaceFolder = async () => {
   const folder = await selectNotesDirectory();
   if (folder) {
     toast.add({
-      title: '已打开笔记文件夹',
+      title: t('navbar.toast.openWorkspaceFolderSuccess'),
       description: folder,
       color: 'primary',
     });
@@ -56,7 +58,7 @@ const handleOpenWorkspaceFolder = async () => {
 
 const handleOpenMarkdownFile = async () => {
   if (!window.ipcRenderer) {
-    toast.add({ title: '当前环境不支持打开文件', color: 'error' });
+    toast.add({ title: t('navbar.toast.unsupportedFileOperation'), color: 'error' });
     return;
   }
   try {
@@ -65,28 +67,28 @@ const handleOpenMarkdownFile = async () => {
 
     const tab = await openTabByPath(filePath);
     if (!tab) {
-      toast.add({ title: '打开文件失败', color: 'error' });
+      toast.add({ title: t('common.toast.openFileFailed'), color: 'error' });
       return;
     }
     toast.add({
-      title: '已打开文件',
+      title: t('navbar.toast.openFileSuccess'),
       description: tab.name,
       color: 'primary',
     });
   } catch (error) {
     console.error('打开文件失败:', error);
-    toast.add({ title: '打开文件失败', color: 'error' });
+    toast.add({ title: t('common.toast.openFileFailed'), color: 'error' });
   }
 };
 
 const handleSaveFromMenu = async () => {
   if (!activeTab.value) {
-    toast.add({ title: '没有正在编辑的文件', color: 'neutral' });
+    toast.add({ title: t('navbar.toast.noEditingFile'), color: 'neutral' });
     return;
   }
   const ok = await saveTab();
   toast.add({
-    title: ok ? '已手动保存' : '保存失败',
+    title: ok ? t('common.toast.manualSaveSuccess') : t('common.toast.manualSaveFailed'),
     color: ok ? 'primary' : 'error',
   });
 };
@@ -107,13 +109,13 @@ const saveAsDefaultDirectory = computed(() => {
   return notesDirectory.value || '';
 });
 const saveAsDefaultFileName = computed(() => {
-  const base = activeTab.value?.name?.replace(/\.md$/i, '') || '未命名笔记';
-  return `${base} - 副本.md`;
+  const base = activeTab.value?.name?.replace(/\.md$/i, '') || t('app.noteDefaultName');
+  return `${base} - ${t('app.noteDefaultCopyName')}.md`;
 });
 
 const openSaveAsDialog = () => {
   if (!activeTab.value) {
-    toast.add({ title: '没有正在编辑的文件', color: 'neutral' });
+    toast.add({ title: t('navbar.toast.noEditingFile'), color: 'neutral' });
     return;
   }
   showSaveAs.value = true;
@@ -121,11 +123,11 @@ const openSaveAsDialog = () => {
 
 const handleSaveAsConfirm = async (payload: { directory: string; fileName: string }) => {
   if (!window.ipcRenderer) {
-    toast.add({ title: '当前环境不支持文件操作', color: 'error' });
+    toast.add({ title: t('navbar.toast.unsupportedFileOperation'), color: 'error' });
     return;
   }
   if (!activeTab.value) {
-    toast.add({ title: '没有正在编辑的文件', color: 'neutral' });
+    toast.add({ title: t('navbar.toast.noEditingFile'), color: 'neutral' });
     return;
   }
 
@@ -137,7 +139,7 @@ const handleSaveAsConfirm = async (payload: { directory: string; fileName: strin
     })) as string | null;
 
     if (!newPath) {
-      toast.add({ title: '创建副本失败', color: 'error' });
+      toast.add({ title: t('navbar.toast.createCopyFailed'), color: 'error' });
       return;
     }
 
@@ -151,7 +153,7 @@ const handleSaveAsConfirm = async (payload: { directory: string; fileName: strin
     });
   } catch (error) {
     console.error('另存为失败:', error);
-    toast.add({ title: '创建副本失败', color: 'error' });
+    toast.add({ title: t('navbar.toast.createCopyFailed'), color: 'error' });
   }
 };
 
@@ -239,108 +241,129 @@ const doClose = () => {
 };
 
 // 导航菜单项
-const navItems = ref([
-  {
-    label: '文件',
-    icon: 'i-lucide-file',
-    children: [
-      { label: '新建笔记', icon: 'i-lucide-file-plus', onSelect: handleCreateNoteFromMenu },
-      { label: '文件夹...', icon: 'i-lucide-folder-open', onSelect: handleOpenWorkspaceFolder },
-      { label: '打开文件...', icon: 'i-lucide-file-text', onSelect: handleOpenMarkdownFile },
-      { label: '保存', icon: 'i-lucide-save', shortcut: 'Ctrl+S', onSelect: handleSaveFromMenu },
-      {
-        label: '另存为...',
-        icon: 'i-lucide-save-all',
-        onSelect: openSaveAsDialog,
-      },
-    ],
-  },
-  {
-    label: '编辑',
-    icon: 'i-lucide-pencil',
-    children: [
-      {
-        label: '撤销',
-        icon: 'i-lucide-undo',
-        shortcut: 'Ctrl+Z',
-        onSelect: () => sendEditorCommand('edit-undo'),
-      },
-      {
-        label: '重做',
-        icon: 'i-lucide-redo',
-        shortcut: 'Ctrl+Y',
-        onSelect: () => sendEditorCommand('edit-redo'),
-      },
-      {
-        label: '剪切',
-        icon: 'i-lucide-scissors',
-        shortcut: 'Ctrl+X',
-        onSelect: () => sendEditorCommand('edit-cut'),
-      },
-      {
-        label: '复制',
-        icon: 'i-lucide-copy',
-        shortcut: 'Ctrl+C',
-        onSelect: () => sendEditorCommand('edit-copy'),
-      },
-      {
-        label: '粘贴',
-        icon: 'i-lucide-clipboard',
-        shortcut: 'Ctrl+V',
-        onSelect: () => sendEditorCommand('edit-paste'),
-      },
-    ],
-  },
-  {
-    label: '视图',
-    icon: 'i-lucide-layout-grid',
-    children: [
-      {
-        label: '全屏',
-        icon: 'i-lucide-maximize',
-        shortcut: 'F11',
-        onSelect: () => window.ipcRenderer?.send('window-toggle-fullscreen'),
-      },
-      {
-        label: '禅模式',
-        icon: 'i-lucide-focus',
-        onSelect: toggleZenMode,
-      },
-      {
-        label: '侧边栏',
-        icon: 'i-lucide-panel-left',
-        onSelect: toggleLeftSidebar,
-      },
-      {
-        label: 'AI 助手',
-        icon: 'i-lucide-sparkles',
-        shortcut: 'Ctrl+L',
-        onSelect: toggleAiSidebar,
-      },
-    ],
-  },
-  {
-    label: '帮助',
-    icon: 'i-lucide-help-circle',
-    children: [
-      {
-        label: '快捷键',
-        icon: 'i-lucide-keyboard',
-        onSelect: () => (showShortcuts.value = true),
-      },
-      {
-        label: '文档',
-        icon: 'i-lucide-book-open',
-        onSelect: () => (showDocs.value = true),
-      },
-      {
-        label: '关于 Lumina',
-        icon: 'i-lucide-info',
-        onSelect: () => (showAbout.value = true),
-      },
-    ],
-  },
-]);
+const navItems = computed(() => {
+  // 强制依赖 locale，确保切换语言后菜单 label 重新计算
+  void locale.value;
+  return [
+    {
+      label: t('navbar.file.title'),
+      icon: 'i-lucide-file',
+      children: [
+        {
+          label: t('navbar.file.new'),
+          icon: 'i-lucide-file-plus',
+          onSelect: handleCreateNoteFromMenu,
+        },
+        {
+          label: t('navbar.file.folder'),
+          icon: 'i-lucide-folder-open',
+          onSelect: handleOpenWorkspaceFolder,
+        },
+        {
+          label: t('navbar.file.open'),
+          icon: 'i-lucide-file-text',
+          onSelect: handleOpenMarkdownFile,
+        },
+        {
+          label: t('navbar.file.save'),
+          icon: 'i-lucide-save',
+          shortcut: 'Ctrl+S',
+          onSelect: handleSaveFromMenu,
+        },
+        {
+          label: t('navbar.file.saveAs'),
+          icon: 'i-lucide-save-all',
+          onSelect: openSaveAsDialog,
+        },
+      ],
+    },
+    {
+      label: t('navbar.edit.title'),
+      icon: 'i-lucide-pencil',
+      children: [
+        {
+          label: t('navbar.edit.undo'),
+          icon: 'i-lucide-undo',
+          shortcut: 'Ctrl+Z',
+          onSelect: () => sendEditorCommand('edit-undo'),
+        },
+        {
+          label: t('navbar.edit.redo'),
+          icon: 'i-lucide-redo',
+          shortcut: 'Ctrl+Y',
+          onSelect: () => sendEditorCommand('edit-redo'),
+        },
+        {
+          label: t('navbar.edit.cut'),
+          icon: 'i-lucide-scissors',
+          shortcut: 'Ctrl+X',
+          onSelect: () => sendEditorCommand('edit-cut'),
+        },
+        {
+          label: t('navbar.edit.copy'),
+          icon: 'i-lucide-copy',
+          shortcut: 'Ctrl+C',
+          onSelect: () => sendEditorCommand('edit-copy'),
+        },
+        {
+          label: t('navbar.edit.paste'),
+          icon: 'i-lucide-clipboard',
+          shortcut: 'Ctrl+V',
+          onSelect: () => sendEditorCommand('edit-paste'),
+        },
+      ],
+    },
+    {
+      label: t('navbar.view.title'),
+      icon: 'i-lucide-layout-grid',
+      children: [
+        {
+          label: t('navbar.view.fullscreen'),
+          icon: 'i-lucide-maximize',
+          shortcut: 'F11',
+          onSelect: () => window.ipcRenderer?.send('window-toggle-fullscreen'),
+        },
+        {
+          label: t('navbar.view.zenMode'),
+          icon: 'i-lucide-focus',
+          onSelect: toggleZenMode,
+        },
+        {
+          label: t('navbar.view.sidebar'),
+          icon: 'i-lucide-panel-left',
+          onSelect: toggleLeftSidebar,
+        },
+        {
+          label: t('navbar.view.aiAssistant'),
+          icon: 'i-lucide-sparkles',
+          shortcut: 'Ctrl+L',
+          onSelect: toggleAiSidebar,
+        },
+      ],
+    },
+    {
+      label: t('navbar.help.title'),
+      icon: 'i-lucide-help-circle',
+      children: [
+        {
+          label: t('navbar.help.shortcuts'),
+          icon: 'i-lucide-keyboard',
+          onSelect: () => (showShortcuts.value = true),
+        },
+        {
+          label: t('navbar.help.docs'),
+          icon: 'i-lucide-book-open',
+          onSelect: () => (showDocs.value = true),
+        },
+        {
+          label: t('navbar.help.about'),
+          icon: 'i-lucide-info',
+          onSelect: () => (showAbout.value = true),
+        },
+      ],
+    },
+  ];
+});
 </script>
 
 <template>
@@ -355,7 +378,7 @@ const navItems = ref([
         <div class="logo">
           <UIcon name="i-lucide-feather" class="w-5 h-5" />
         </div>
-        <span class="logo-text">Lumina</span>
+        <span class="logo-text">{{ $t('app.name') }}</span>
       </div>
 
       <!-- 导航菜单 -->
@@ -375,7 +398,7 @@ const navItems = ref([
     <div class="navbar-center">
       <button class="search-trigger" @click="searchOpen = true">
         <UIcon name="i-lucide-search" class="w-4 h-4" />
-        <span>搜索笔记...</span>
+        <span>{{ $t('navbar.search.placeholder') }}</span>
         <kbd>Ctrl+P</kbd>
       </button>
     </div>
@@ -384,10 +407,10 @@ const navItems = ref([
     <div class="navbar-right">
       <!-- 工具栏 -->
       <div class="toolbar">
-        <UTooltip text="同步">
+        <UTooltip :text="$t('navbar.toolbar.sync')">
           <UButton variant="ghost" color="neutral" size="xs" icon="i-lucide-cloud" />
         </UTooltip>
-        <UTooltip text="设置">
+        <UTooltip :text="$t('navbar.toolbar.settings')">
           <UButton
             variant="ghost"
             color="neutral"
@@ -400,17 +423,21 @@ const navItems = ref([
 
       <!-- 窗口控制按钮 -->
       <div class="window-controls">
-        <button class="control-btn" @click="minimizeWindow" title="最小化">
+        <button class="control-btn" @click="minimizeWindow" :title="$t('navbar.window.minimize')">
           <UIcon name="i-lucide-minus" class="w-4 h-4" />
         </button>
         <button
           class="control-btn"
           @click="toggleMaximize"
-          :title="isMaximized ? '还原' : '最大化'"
+          :title="isMaximized ? $t('navbar.window.restore') : $t('navbar.window.maximize')"
         >
           <UIcon :name="isMaximized ? 'i-lucide-copy' : 'i-lucide-square'" class="w-3.5 h-3.5" />
         </button>
-        <button class="control-btn control-btn--close" @click="handleCloseClick" title="关闭">
+        <button
+          class="control-btn control-btn--close"
+          @click="handleCloseClick"
+          :title="$t('navbar.window.close')"
+        >
           <UIcon name="i-lucide-x" class="w-4 h-4" />
         </button>
       </div>
@@ -441,27 +468,27 @@ const navItems = ref([
             <div class="dialog-icon">
               <UIcon name="i-lucide-log-out" class="w-6 h-6" />
             </div>
-            <h3 class="dialog-title">关闭应用</h3>
-            <p class="dialog-description">请选择你想要的操作</p>
+            <h3 class="dialog-title">{{ $t('navbar.window.closeApplication') }}</h3>
+            <p class="dialog-description">{{ $t('navbar.window.pleaseSelectOperation') }}</p>
           </div>
 
           <!-- 选项按钮 -->
           <div class="dialog-options">
             <button class="option-btn option-minimize" @click="doMinimize">
               <UIcon name="i-lucide-minus-circle" class="w-5 h-5" />
-              <span class="option-title">最小化到托盘</span>
-              <span class="option-desc">应用将在后台运行</span>
+              <span class="option-title">{{ $t('navbar.window.minimizeToTray') }}</span>
+              <span class="option-desc">{{ $t('navbar.window.runInBackground') }}</span>
             </button>
             <button class="option-btn option-close" @click="doClose">
               <UIcon name="i-lucide-power" class="w-5 h-5" />
-              <span class="option-title">退出应用</span>
-              <span class="option-desc">完全关闭程序</span>
+              <span class="option-title">{{ $t('navbar.window.closeApplication') }}</span>
+              <span class="option-desc">{{ $t('navbar.window.entireCloseApplication') }}</span>
             </button>
           </div>
 
           <!-- 记住选择 -->
           <div class="dialog-footer">
-            <UCheckbox v-model="rememberChoice" label="记住我的选择，下次不再询问" />
+            <UCheckbox v-model="rememberChoice" :label="$t('navbar.window.rememberChoice')" />
           </div>
         </div>
       </template>
