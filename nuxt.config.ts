@@ -16,7 +16,6 @@ export default defineNuxtConfig({
     '@nuxtjs/i18n',
   ],
   i18n: {
-    // Electron + hashMode 场景：不建议通过路由前缀切换语言（/en/...）
     strategy: 'no_prefix',
     defaultLocale: 'zh-CN',
     // v10 推荐：使用 langDir + locales[].file 实现按需加载
@@ -29,7 +28,7 @@ export default defineNuxtConfig({
     ],
     // Electron 下由本地 settings.json 决定语言，不做浏览器语言探测
     detectBrowserLanguage: false,
-    vueI18n: './i18n.config.ts',
+    vueI18n: './i18n/i18n.config.ts',
   },
   components: [{ path: '~/components', extensions: ['vue'] }],
   shadcn: { prefix: '', componentDir: '~/components/ui' },
