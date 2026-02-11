@@ -87,6 +87,49 @@
         "description": "Applies immediately and is saved to local settings.json",
         "zhCN": "中文",
         "en": "English"
+      },
+      "theme": {
+        "title": "Theme",
+        "description": "Switch appearance mode and color themes, with local persistence in settings.json",
+        "mode": {
+          "light": "Light",
+          "dark": "Dark",
+          "system": "System"
+        },
+        "presets": {
+          "title": "Theme list",
+          "paper": "Paper",
+          "ocean": "Ocean",
+          "forest": "Forest"
+        },
+        "custom": {
+          "title": "Custom theme",
+          "creating": "Create a new custom theme",
+          "editing": "Edit current custom theme",
+          "namePlaceholder": "Theme name",
+          "lightTitle": "Light palette",
+          "darkTitle": "Dark palette",
+          "fields": {
+            "bgApp": "App background",
+            "bgPaper": "Content background",
+            "textMain": "Primary text",
+            "textMute": "Muted text",
+            "border": "Border",
+            "accent": "Accent"
+          },
+          "create": "Save as new theme",
+          "update": "Update current theme",
+          "delete": "Delete current theme",
+          "deleteConfirm": "Delete the current custom theme? This action cannot be undone.",
+          "toast": {
+            "nameRequired": "Please enter a theme name first",
+            "saveFailed": "Failed to save theme, please try again",
+            "created": "Custom theme created",
+            "updated": "Custom theme updated",
+            "deleted": "Custom theme deleted",
+            "deleteFailed": "Delete failed, please try again"
+          }
+        }
       }
     },
     "notes": {

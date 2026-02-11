@@ -87,6 +87,49 @@
         "description": "切换后立即生效，并会保存在本地 settings.json",
         "zhCN": "中文",
         "en": "English"
+      },
+      "theme": {
+        "title": "主题",
+        "description": "切换显示模式与配色主题，支持自定义并自动保存在本地 settings.json",
+        "mode": {
+          "light": "浅色",
+          "dark": "深色",
+          "system": "跟随系统"
+        },
+        "presets": {
+          "title": "主题列表",
+          "paper": "羊皮纸",
+          "ocean": "海岸蓝",
+          "forest": "森林绿"
+        },
+        "custom": {
+          "title": "自定义主题",
+          "creating": "创建新主题",
+          "editing": "编辑当前自定义主题",
+          "namePlaceholder": "输入主题名称",
+          "lightTitle": "浅色变量",
+          "darkTitle": "深色变量",
+          "fields": {
+            "bgApp": "应用背景",
+            "bgPaper": "内容背景",
+            "textMain": "主文本",
+            "textMute": "次文本",
+            "border": "边框",
+            "accent": "强调色"
+          },
+          "create": "保存为新主题",
+          "update": "更新当前主题",
+          "delete": "删除当前主题",
+          "deleteConfirm": "确定删除当前自定义主题吗？此操作不可撤销。",
+          "toast": {
+            "nameRequired": "请先填写主题名称",
+            "saveFailed": "主题保存失败，请重试",
+            "created": "已创建自定义主题",
+            "updated": "已更新自定义主题",
+            "deleted": "已删除自定义主题",
+            "deleteFailed": "删除失败，请稍后重试"
+          }
+        }
       }
     },
     "notes": {

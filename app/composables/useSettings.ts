@@ -3,6 +3,13 @@
  * 管理用户偏好设置，使用 JSON 文件持久化存储
  */
 
+import {
+  DEFAULT_THEME_ID,
+  normalizeThemeMode,
+  normalizeThemePresets,
+  resolveActiveThemeId,
+} from '~/composables/theme/theme-presets';
+import type { ThemeMode, ThemePreset } from '~/composables/theme/theme.types';
 import { parseAiBaseUrl } from '~/utils/ai/baseUrl';
 
 export interface AiModelPoolItem {
@@ -13,7 +20,9 @@ export interface AiModelPoolItem {
 export interface AppSettings {
   notesDirectory: string | null; // 笔记存储目录
   autoSaveDelay: number; // 自动保存延迟（毫秒）
-  theme: 'light' | 'dark' | 'system';
+  theme: ThemeMode;
+  activeThemeId: string; // 当前激活主题（内置 + 自定义共用）
+  customThemes: ThemePreset[]; // 用户自定义主题
   /**
    * 应用语言（i18n locale）
    * - Electron 场景不建议用路由前缀切换语言，因此使用本地 settings.json 持久化
@@ -45,11 +54,100 @@ const CONFIG_FILE = 'settings.json';
 
 const DEFAULT_AI_MODEL = 'openai/gpt-4o-mini';
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function cloneThemePreset(theme: ThemePreset): ThemePreset {
+  return {
+    ...theme,
+    lightVars: { ...theme.lightVars },
+    darkVars: theme.darkVars ? { ...theme.darkVars } : undefined,
+  };
+}
+
 function cloneDefaultSettings(): AppSettings {
   return {
     ...defaultSettings,
     // 避免默认值中的数组/对象被意外共享引用
     aiModelsPool: defaultSettings.aiModelsPool.map((m) => ({ ...m })),
+    customThemes: defaultSettings.customThemes.map((theme) => cloneThemePreset(theme)),
+  };
+}
+
+function normalizeAiModelsPool(value: unknown): AiModelPoolItem[] {
+  if (!Array.isArray(value)) {
+    return defaultSettings.aiModelsPool.map((m) => ({ ...m }));
+  }
+
+  const normalized: AiModelPoolItem[] = [];
+  const seenIds = new Set<string>();
+  for (const item of value) {
+    if (!isObjectRecord(item)) continue;
+    const id = typeof item.id === 'string' ? item.id.trim() : '';
+    if (!id || seenIds.has(id)) continue;
+    seenIds.add(id);
+    normalized.push({ id, enabled: Boolean(item.enabled) });
+  }
+
+  if (normalized.length === 0) {
+    return defaultSettings.aiModelsPool.map((m) => ({ ...m }));
+  }
+  return normalized;
+}
+
+function normalizeRoleModelId(
+  value: unknown,
+  pool: AiModelPoolItem[],
+  fallback: string | null,
+): string | null {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (raw && pool.some((item) => item.id === raw)) return raw;
+  if (fallback && pool.some((item) => item.id === fallback)) return fallback;
+  return pool[0]?.id ?? null;
+}
+
+function normalizeIncomingSettings(value: unknown): AppSettings {
+  const base = cloneDefaultSettings();
+  if (!isObjectRecord(value)) return base;
+
+  const merged = { ...base, ...value } as AppSettings;
+  const aiModelsPool = normalizeAiModelsPool((merged as any).aiModelsPool);
+  const customThemes = normalizeThemePresets((merged as any).customThemes);
+  const activeThemeId = resolveActiveThemeId((merged as any).activeThemeId, customThemes);
+
+  const normalizedNotesDirectory =
+    typeof merged.notesDirectory === 'string' && merged.notesDirectory.trim()
+      ? merged.notesDirectory
+      : null;
+  const normalizedDelay = Number(merged.autoSaveDelay);
+  const normalizedAutoSaveDelay =
+    Number.isFinite(normalizedDelay) && normalizedDelay >= 200 && normalizedDelay <= 60000
+      ? normalizedDelay
+      : base.autoSaveDelay;
+
+  return {
+    ...base,
+    ...merged,
+    notesDirectory: normalizedNotesDirectory,
+    autoSaveDelay: normalizedAutoSaveDelay,
+    theme: normalizeThemeMode((merged as any).theme),
+    activeThemeId,
+    customThemes,
+    locale: merged.locale === 'en' ? 'en' : 'zh-CN',
+    aiApiKey: typeof merged.aiApiKey === 'string' ? merged.aiApiKey.trim() || null : null,
+    aiBaseUrl:
+      typeof merged.aiBaseUrl === 'string' && merged.aiBaseUrl.trim()
+        ? merged.aiBaseUrl.trim()
+        : base.aiBaseUrl,
+    aiModelsPool,
+    aiChatModelId: normalizeRoleModelId(merged.aiChatModelId, aiModelsPool, base.aiChatModelId),
+    aiFastModelId: normalizeRoleModelId(merged.aiFastModelId, aiModelsPool, base.aiFastModelId),
+    aiCompletionModelId: normalizeRoleModelId(
+      merged.aiCompletionModelId,
+      aiModelsPool,
+      base.aiCompletionModelId,
+    ),
   };
 }
 
@@ -58,6 +156,8 @@ const defaultSettings: AppSettings = {
   notesDirectory: null,
   autoSaveDelay: 1500,
   theme: 'system',
+  activeThemeId: DEFAULT_THEME_ID,
+  customThemes: [],
   locale: 'zh-CN',
   aiApiKey: null,
   // 用户通常只需要填写「Base URL」本体；请求时会自动追加 /v1（末尾加 # 可禁用）
@@ -85,19 +185,7 @@ export function useSettings() {
     isLoading.value = true;
     try {
       const data = await window.ipcRenderer.invoke('config-read', CONFIG_FILE);
-      if (data) {
-        const base = cloneDefaultSettings();
-        const merged = { ...base, ...(data as any) } as AppSettings;
-
-        // 简单防御：确保 aiModelsPool 是数组
-        if (!Array.isArray((merged as any).aiModelsPool)) {
-          merged.aiModelsPool = base.aiModelsPool;
-        }
-
-        settings.value = merged;
-      } else {
-        settings.value = cloneDefaultSettings();
-      }
+      settings.value = normalizeIncomingSettings(data);
       isInitialized.value = true;
     } catch (error) {
       console.error('加载设置失败:', error);
@@ -128,19 +216,14 @@ export function useSettings() {
 
   // 批量 patch（一次写盘），给更复杂的设置场景使用（例如 AI 模型池）
   const patchSettings = async (patch: Partial<AppSettings>) => {
-    const next = { ...settings.value, ...patch };
+    const next = normalizeIncomingSettings({ ...settings.value, ...patch });
     settings.value = next;
     await saveSettings(next);
   };
 
   // 更新笔记目录
   const setNotesDirectory = async (path: string | null) => {
-    // 先构造新的设置对象
-    const newSettings = { ...settings.value, notesDirectory: path };
-    // 更新状态
-    settings.value = newSettings;
-    // 保存到文件
-    await saveSettings(newSettings);
+    await patchSettings({ notesDirectory: path });
   };
 
   // 选择笔记目录（调用 Electron 对话框）
@@ -156,24 +239,18 @@ export function useSettings() {
 
   // 更新自动保存延迟
   const setAutoSaveDelay = async (delay: number) => {
-    const newSettings = { ...settings.value, autoSaveDelay: delay };
-    settings.value = newSettings;
-    await saveSettings(newSettings);
+    await patchSettings({ autoSaveDelay: delay });
   };
 
   // 更新主题
-  const setTheme = async (theme: 'light' | 'dark' | 'system') => {
-    const newSettings = { ...settings.value, theme };
-    settings.value = newSettings;
-    await saveSettings(newSettings);
+  const setTheme = async (theme: ThemeMode) => {
+    await patchSettings({ theme: normalizeThemeMode(theme) });
   };
 
   // 更新 AI Key
   const setAiApiKey = async (key: string | null) => {
     const normalized = key?.trim() || null;
-    const newSettings = { ...settings.value, aiApiKey: normalized };
-    settings.value = newSettings;
-    await saveSettings(newSettings);
+    await patchSettings({ aiApiKey: normalized });
   };
 
   // 更新 AI Base URL
@@ -187,12 +264,7 @@ export function useSettings() {
       ? `${parsed.baseURL}${parsed.disableAutoAppendV1 ? '#' : ''}`
       : '';
 
-    const newSettings = {
-      ...settings.value,
-      aiBaseUrl: normalized || defaultSettings.aiBaseUrl,
-    };
-    settings.value = newSettings;
-    await saveSettings(newSettings);
+    await patchSettings({ aiBaseUrl: normalized || defaultSettings.aiBaseUrl });
   };
 
   // 重置设置
@@ -211,6 +283,8 @@ export function useSettings() {
     notesDirectory: computed(() => settings.value.notesDirectory),
     autoSaveDelay: computed(() => settings.value.autoSaveDelay),
     theme: computed(() => settings.value.theme),
+    activeThemeId: computed(() => settings.value.activeThemeId),
+    customThemes: computed(() => settings.value.customThemes),
     aiApiKey: computed(() => settings.value.aiApiKey),
     aiBaseUrl: computed(() => settings.value.aiBaseUrl),
     aiModelsPool: computed(() => settings.value.aiModelsPool),

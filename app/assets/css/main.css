@@ -4,6 +4,7 @@
 @import 'tailwindcss';
 @import './transition.css';
 @import './note.css';
+@import './themes.css';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
@@ -172,37 +173,7 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* ========================================
-   Tailwind 主题扩展
-   ======================================== */
 
-@theme static {
-  /* 主色调 - 暖金棕 */
-  --color-primary-50: #fffbeb;
-  --color-primary-100: #fef3c7;
-  --color-primary-200: #fde68a;
-  --color-primary-300: #fcd34d;
-  --color-primary-400: #fbbf24;
-  --color-primary-500: #d4a017;
-  --color-primary-600: #b8860b;
-  --color-primary-700: #9a7209;
-  --color-primary-800: #7c5c07;
-  --color-primary-900: #5e4506;
-  --color-primary-950: #3f2c06;
-
-  /* 中性色 - 暖灰/羊皮纸色调 */
-  --color-neutral-50: #faf9f6;
-  --color-neutral-100: #f0eee5;
-  --color-neutral-200: #e8e5dc;
-  --color-neutral-300: #d6d3c9;
-  --color-neutral-400: #b0aca5;
-  --color-neutral-500: #857f78;
-  --color-neutral-600: #6d6862;
-  --color-neutral-700: #54504c;
-  --color-neutral-800: #3b3835;
-  --color-neutral-900: #332f2c;
-  --color-neutral-950: #1f1c1a;
-}
 
 /* ========================================
    全局样式
