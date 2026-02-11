@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DynamicToolUIPart } from 'ai';
 import type { PromptInputMessage } from '~/components/ai-elements/prompt-input';
 import type {
   AiAssistantMessage,
@@ -45,6 +46,16 @@ import {
 } from '~/components/ai-elements/chain-of-thought';
 import { Sources, SourcesContent, SourcesTrigger } from '~/components/ai-elements/sources';
 import { Suggestion, Suggestions } from '~/components/ai-elements/suggestion';
+import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '~/components/ai-elements/tool';
+import {
+  Confirmation,
+  ConfirmationAccepted,
+  ConfirmationAction,
+  ConfirmationActions,
+  ConfirmationRejected,
+  ConfirmationRequest,
+  ConfirmationTitle,
+} from '~/components/ai-elements/confirmation';
 
 import AiAssistantChatModelPicker from '~/components/ai-assistant/AiAssistantChatModelPicker.vue';
 import { useAiAssistantChat } from '~/composables/ai/useAiAssistantChat';
@@ -59,6 +70,7 @@ const {
   status,
   isBusy,
   sendMessage,
+  respondToolApproval,
   abort,
   clear,
   createSession,
@@ -98,6 +110,63 @@ const getMessageSources = (message: AiAssistantMessage): AiAssistantRagSource[] 
 const getRagWarning = (message: AiAssistantMessage) => {
   const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
   return typeof metadata.ragWarning === 'string' ? metadata.ragWarning : '';
+};
+
+type AssistantToolApproval = {
+  id: string;
+  approved?: boolean;
+  reason?: string;
+};
+
+type AssistantToolPart = DynamicToolUIPart & {
+  approval?: AssistantToolApproval;
+};
+
+const validToolStates = new Set([
+  'input-streaming',
+  'input-available',
+  'approval-requested',
+  'approval-responded',
+  'output-available',
+  'output-error',
+  'output-denied',
+]);
+
+const isAssistantToolPart = (part: any): part is AssistantToolPart => {
+  return (
+    part
+    && typeof part === 'object'
+    && part.type === 'dynamic-tool'
+    && typeof part.toolCallId === 'string'
+    && part.toolCallId.trim().length > 0
+    && typeof part.toolName === 'string'
+    && part.toolName.trim().length > 0
+    && typeof part.state === 'string'
+    && validToolStates.has(part.state)
+  );
+};
+
+const getToolParts = (message: AiAssistantMessage): AssistantToolPart[] => {
+  const parts = Array.isArray(message.parts) ? message.parts : [];
+  const filtered = parts.filter((part) => isAssistantToolPart(part));
+  const seen = new Set<string>();
+  return filtered.filter((part) => {
+    if (seen.has(part.toolCallId)) return false;
+    seen.add(part.toolCallId);
+    return true;
+  });
+};
+
+const isToolApprovalPending = (toolPart: AssistantToolPart) =>
+  toolPart.state === 'approval-requested' && !!toolPart.approval?.id;
+
+const handleToolApproval = async (toolPart: AssistantToolPart, approved: boolean) => {
+  if (!toolPart.approval?.id) return;
+  await respondToolApproval({
+    approvalId: toolPart.approval.id,
+    approved,
+    reason: approved ? '用户已批准执行工具' : '用户拒绝执行该工具',
+  });
 };
 
 const isMessageStreaming = (message: AiAssistantMessage) => {
@@ -540,6 +609,67 @@ const handleDeleteSession = async (sessionId: string) => {
                     </div>
                   </ChainOfThoughtContent>
                 </ChainOfThought>
+
+                <div v-if="getToolParts(message).length > 0" class="mb-2 space-y-2">
+                  <Tool
+                    v-for="toolPart in getToolParts(message)"
+                    :key="`${message.id}-${toolPart.toolCallId}`"
+                    :default-open="true"
+                  >
+                    <ToolHeader
+                      type="dynamic-tool"
+                      :state="toolPart.state"
+                      :tool-name="toolPart.toolName"
+                    />
+
+                    <ToolContent>
+                      <ToolInput :input="toolPart.input" />
+
+                      <Confirmation
+                        v-if="toolPart.approval"
+                        :approval="toolPart.approval"
+                        :state="toolPart.state"
+                        class="mx-4 mb-4"
+                      >
+                        <ConfirmationTitle>
+                          该工具将修改笔记内容，是否允许执行？
+                        </ConfirmationTitle>
+
+                        <ConfirmationRequest>
+                          <ConfirmationActions>
+                            <ConfirmationAction
+                              :disabled="!isToolApprovalPending(toolPart)"
+                              @click="handleToolApproval(toolPart, true)"
+                            >
+                              批准
+                            </ConfirmationAction>
+                            <ConfirmationAction
+                              variant="outline"
+                              :disabled="!isToolApprovalPending(toolPart)"
+                              @click="handleToolApproval(toolPart, false)"
+                            >
+                              拒绝
+                            </ConfirmationAction>
+                          </ConfirmationActions>
+                        </ConfirmationRequest>
+
+                        <ConfirmationAccepted>
+                          <div class="text-xs">
+                            审批通过{{ toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : '' }}
+                          </div>
+                        </ConfirmationAccepted>
+
+                        <ConfirmationRejected>
+                          <div class="text-xs">
+                            审批拒绝{{ toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : '' }}
+                          </div>
+                        </ConfirmationRejected>
+                      </Confirmation>
+
+                      <ToolOutput :output="toolPart.output" :error-text="toolPart.errorText" />
+                    </ToolContent>
+                  </Tool>
+                </div>
 
                 <MessageResponse :content="getMessageText(message)" />
 

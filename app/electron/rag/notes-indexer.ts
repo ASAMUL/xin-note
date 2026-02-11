@@ -88,10 +88,10 @@ export function buildRagChunksForDoc(
   docId: string,
   content: string,
   options: ChunkOptions = {},
-): RagChunkInput[] {
+): Record<string, unknown>[] {
   // Index even very small notes/sections (e.g. a short title) so they remain searchable.
   const chunks = chunkText(content || '', { minChunkSize: 1, ...options });
-  const rows: RagChunkInput[] = [];
+  const rows: Record<string, unknown>[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const c = chunks[i]!;
     rows.push({
@@ -107,7 +107,7 @@ export function buildRagChunksForDoc(
 async function createOrOverwriteNotesTable(
   db: Connection,
   tableName: string,
-  rows: RagChunkInput[],
+  rows: Record<string, unknown>[],
 ): Promise<Table> {
   const schema = buildNotesSchema();
 
@@ -170,7 +170,7 @@ export async function reindexNotesDirectory(
     const files = await walkMarkdownFiles(root);
     const targetFiles = maxFiles ? files.slice(0, maxFiles) : files;
 
-    const rows: RagChunkInput[] = [];
+    const rows: Record<string, unknown>[] = [];
     for (const filePath of targetFiles) {
       if (!isMarkdownFile(filePath)) continue;
 

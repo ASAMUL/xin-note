@@ -2,7 +2,11 @@ import type { ChatStatus, FileUIPart, UIMessage } from 'ai';
 
 import { nanoid } from 'nanoid';
 
-import type { AiAssistantMessage, AiAssistantMessageMeta, AiAssistantSession } from '~/types/ai-assistant';
+import type {
+  AiAssistantMessage,
+  AiAssistantMessageMeta,
+  AiAssistantSession,
+} from '~/types/ai-assistant';
 import { normalizeAiError } from '~/utils/ai/normalizeAiError';
 
 import {
@@ -12,9 +16,37 @@ import {
 } from './useAiAssistantHistory';
 import { useAiAssistantRag } from './useAiAssistantRag';
 import { useAiRoleModel } from './useAiRoleModel';
+import { useNotes } from '../useNotes';
+import { useTabs } from '../useTabs';
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+type ToolPartState =
+  | 'input-streaming'
+  | 'input-available'
+  | 'approval-requested'
+  | 'approval-responded'
+  | 'output-available'
+  | 'output-error'
+  | 'output-denied';
+
+interface AssistantToolPartApproval {
+  id: string;
+  approved?: boolean;
+  reason?: string;
+}
+
+interface AssistantToolPart {
+  type: 'dynamic-tool';
+  toolName: string;
+  toolCallId: string;
+  input: Record<string, any>;
+  output?: unknown;
+  errorText?: string;
+  state: ToolPartState;
+  approval?: AssistantToolPartApproval;
 }
 
 function sortSessionsByUpdatedAt(sessions: AiAssistantSession[]) {
@@ -25,6 +57,8 @@ export function useAiAssistantChat() {
   const { aiApiKey, aiBaseUrl, modelId, resolved } = useAiRoleModel('chat');
   const { searchNotes } = useAiAssistantRag();
   const { loadState, scheduleSave, flushSave, groupSessionsByDate } = useAiAssistantHistory();
+  const { loadNotes } = useNotes();
+  const { reloadTabContentByPath } = useTabs();
 
   const sessions = useState<AiAssistantSession[]>('ai-assistant:sessions', () => []);
   const activeSessionId = useState<string | null>('ai-assistant:active-session-id', () => null);
@@ -226,6 +260,60 @@ export function useAiAssistantChat() {
     });
   };
 
+  const upsertToolPart = (
+    sessionId: string,
+    assistantId: string,
+    patch: {
+      toolCallId: string;
+      toolName: string;
+      input?: Record<string, any>;
+      output?: unknown;
+      errorText?: string;
+      state?: ToolPartState;
+      approval?: AssistantToolPartApproval;
+    },
+  ) => {
+    updateAssistantMessage(sessionId, assistantId, (current) => {
+      const parts = Array.isArray(current.parts) ? [...current.parts] : [];
+      const index = parts.findIndex(
+        (part: any) => part?.type === 'dynamic-tool' && part?.toolCallId === patch.toolCallId,
+      );
+
+      const prev: AssistantToolPart =
+        index >= 0
+          ? (parts[index] as AssistantToolPart)
+          : {
+              type: 'dynamic-tool',
+              toolName: patch.toolName,
+              toolCallId: patch.toolCallId,
+              input: patch.input || {},
+              state: patch.state || 'input-available',
+            };
+
+      const next: AssistantToolPart = {
+        ...prev,
+        toolName: patch.toolName || prev.toolName,
+        toolCallId: patch.toolCallId || prev.toolCallId,
+        input: patch.input ?? prev.input ?? {},
+        output: patch.output ?? prev.output,
+        errorText: patch.errorText ?? prev.errorText,
+        state: patch.state || prev.state,
+        approval: patch.approval ?? prev.approval,
+      };
+
+      if (index >= 0) {
+        parts[index] = next as any;
+      } else {
+        parts.push(next as any);
+      }
+
+      return {
+        ...current,
+        parts,
+      } as AiAssistantMessage;
+    });
+  };
+
   const markAssistantPartsDone = (sessionId: string, assistantId: string) => {
     updateAssistantMessage(sessionId, assistantId, (current) => {
       const parts = Array.isArray(current.parts) ? [...current.parts] : [];
@@ -337,6 +425,169 @@ export function useAiAssistantChat() {
     setReasoningState(sessionId, assistantId, payload.id, { state: 'done' });
   };
 
+  const onToolCall = (
+    _event: unknown,
+    payload: {
+      streamId: string;
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, any>;
+    },
+  ) => {
+    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.toolCallId)
+      return;
+
+    const sessionId = activeStreamSessionId.value;
+    const assistantId = activeAssistantId.value;
+    if (!sessionId || !assistantId) return;
+
+    upsertToolPart(sessionId, assistantId, {
+      toolCallId: payload.toolCallId,
+      toolName: payload.toolName || 'tool',
+      input: payload.input || {},
+      state: 'input-available',
+      errorText: '',
+    });
+  };
+
+  const onToolApprovalRequest = (
+    _event: unknown,
+    payload: {
+      streamId: string;
+      approvalId: string;
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, any>;
+    },
+  ) => {
+    if (
+      !payload?.streamId ||
+      payload.streamId !== activeStreamId.value ||
+      !payload?.toolCallId ||
+      !payload?.approvalId
+    ) {
+      return;
+    }
+
+    const sessionId = activeStreamSessionId.value;
+    const assistantId = activeAssistantId.value;
+    if (!sessionId || !assistantId) return;
+
+    upsertToolPart(sessionId, assistantId, {
+      toolCallId: payload.toolCallId,
+      toolName: payload.toolName || 'tool',
+      input: payload.input || {},
+      state: 'approval-requested',
+      approval: {
+        id: payload.approvalId,
+      },
+      errorText: '',
+    });
+  };
+
+  const onToolApprovalResponse = (
+    _event: unknown,
+    payload: {
+      streamId: string;
+      approvalId: string;
+      toolCallId: string;
+      toolName: string;
+      approved: boolean;
+      reason?: string;
+    },
+  ) => {
+    if (
+      !payload?.streamId ||
+      payload.streamId !== activeStreamId.value ||
+      !payload?.toolCallId ||
+      !payload?.approvalId
+    ) {
+      return;
+    }
+
+    const sessionId = activeStreamSessionId.value;
+    const assistantId = activeAssistantId.value;
+    if (!sessionId || !assistantId) return;
+
+    upsertToolPart(sessionId, assistantId, {
+      toolCallId: payload.toolCallId,
+      toolName: payload.toolName || 'tool',
+      state: 'approval-responded',
+      approval: {
+        id: payload.approvalId,
+        approved: !!payload.approved,
+        reason: payload.reason || '',
+      },
+    });
+  };
+
+  const onToolResult = (
+    _event: unknown,
+    payload: {
+      streamId: string;
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, any>;
+      output: unknown;
+      denied?: boolean;
+    },
+  ) => {
+    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.toolCallId)
+      return;
+
+    const sessionId = activeStreamSessionId.value;
+    const assistantId = activeAssistantId.value;
+    if (!sessionId || !assistantId) return;
+
+    upsertToolPart(sessionId, assistantId, {
+      toolCallId: payload.toolCallId,
+      toolName: payload.toolName || 'tool',
+      input: payload.input || {},
+      output: payload.output,
+      state: payload.denied ? 'output-denied' : 'output-available',
+      errorText: '',
+    });
+
+    const output =
+      payload.output && typeof payload.output === 'object' ? (payload.output as any) : null;
+    const isWriteTool =
+      payload.toolName === 'createNote' ||
+      payload.toolName === 'replaceText' ||
+      payload.toolName === 'appendContent';
+    if (isWriteTool && output?.ok) {
+      if (typeof output.path === 'string' && output.path.trim()) {
+        void reloadTabContentByPath(output.path);
+      }
+      void loadNotes();
+    }
+  };
+
+  const onToolError = (
+    _event: unknown,
+    payload: {
+      streamId: string;
+      toolCallId: string;
+      toolName: string;
+      input: Record<string, any>;
+      errorText: string;
+    },
+  ) => {
+    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.toolCallId)
+      return;
+
+    const sessionId = activeStreamSessionId.value;
+    const assistantId = activeAssistantId.value;
+    if (!sessionId || !assistantId) return;
+
+    upsertToolPart(sessionId, assistantId, {
+      toolCallId: payload.toolCallId,
+      toolName: payload.toolName || 'tool',
+      input: payload.input || {},
+      errorText: payload.errorText || '工具执行失败',
+      state: 'output-error',
+    });
+  };
+
   const onEnd = async (_event: unknown, payload: { streamId: string }) => {
     if (!payload?.streamId || payload.streamId !== activeStreamId.value) return;
 
@@ -382,12 +633,17 @@ export function useAiAssistantChat() {
     if (listenersReady.value) return;
     if (!window.ipcRenderer) return;
 
-    window.ipcRenderer.on('ai:chat-stream-delta', onDelta as any);
-    window.ipcRenderer.on('ai:chat-stream-reasoning-start', onReasoningStart as any);
-    window.ipcRenderer.on('ai:chat-stream-reasoning-delta', onReasoningDelta as any);
-    window.ipcRenderer.on('ai:chat-stream-reasoning-end', onReasoningEnd as any);
-    window.ipcRenderer.on('ai:chat-stream-end', onEnd as any);
-    window.ipcRenderer.on('ai:chat-stream-error', onError as any);
+    window.ipcRenderer.on('ai:chat-stream-delta', onDelta);
+    window.ipcRenderer.on('ai:chat-stream-reasoning-start', onReasoningStart);
+    window.ipcRenderer.on('ai:chat-stream-reasoning-delta', onReasoningDelta);
+    window.ipcRenderer.on('ai:chat-stream-reasoning-end', onReasoningEnd);
+    window.ipcRenderer.on('ai:chat-stream-tool-call', onToolCall);
+    window.ipcRenderer.on('ai:chat-stream-tool-approval-request', onToolApprovalRequest);
+    window.ipcRenderer.on('ai:chat-stream-tool-approval-response', onToolApprovalResponse);
+    window.ipcRenderer.on('ai:chat-stream-tool-result', onToolResult);
+    window.ipcRenderer.on('ai:chat-stream-tool-error', onToolError);
+    window.ipcRenderer.on('ai:chat-stream-end', onEnd);
+    window.ipcRenderer.on('ai:chat-stream-error', onError);
 
     listenersReady.value = true;
   };
@@ -469,6 +725,28 @@ export function useAiAssistantChat() {
       sessions: sessions.value,
       activeSessionId: activeSessionId.value,
     });
+  };
+
+  const respondToolApproval = async (payload: {
+    approvalId: string;
+    approved: boolean;
+    reason?: string;
+  }) => {
+    if (!window.ipcRenderer) return false;
+    const approvalId = (payload.approvalId || '').trim();
+    if (!approvalId) return false;
+
+    try {
+      const ok = await window.ipcRenderer.invoke('ai:tool-approval-respond', {
+        approvalId,
+        approved: !!payload.approved,
+        reason: payload.reason || '',
+      });
+      return !!ok;
+    } catch (approvalError) {
+      error.value = normalizeAiError(approvalError);
+      return false;
+    }
   };
 
   const clear = async () => {
@@ -656,12 +934,17 @@ export function useAiAssistantChat() {
 
   onBeforeUnmount(() => {
     if (window.ipcRenderer && listenersReady.value) {
-      window.ipcRenderer.off('ai:chat-stream-delta', onDelta as any);
-      window.ipcRenderer.off('ai:chat-stream-reasoning-start', onReasoningStart as any);
-      window.ipcRenderer.off('ai:chat-stream-reasoning-delta', onReasoningDelta as any);
-      window.ipcRenderer.off('ai:chat-stream-reasoning-end', onReasoningEnd as any);
-      window.ipcRenderer.off('ai:chat-stream-end', onEnd as any);
-      window.ipcRenderer.off('ai:chat-stream-error', onError as any);
+      window.ipcRenderer.off('ai:chat-stream-delta', onDelta);
+      window.ipcRenderer.off('ai:chat-stream-reasoning-start', onReasoningStart);
+      window.ipcRenderer.off('ai:chat-stream-reasoning-delta', onReasoningDelta);
+      window.ipcRenderer.off('ai:chat-stream-reasoning-end', onReasoningEnd);
+      window.ipcRenderer.off('ai:chat-stream-tool-call', onToolCall);
+      window.ipcRenderer.off('ai:chat-stream-tool-approval-request', onToolApprovalRequest);
+      window.ipcRenderer.off('ai:chat-stream-tool-approval-response', onToolApprovalResponse);
+      window.ipcRenderer.off('ai:chat-stream-tool-result', onToolResult);
+      window.ipcRenderer.off('ai:chat-stream-tool-error', onToolError);
+      window.ipcRenderer.off('ai:chat-stream-end', onEnd);
+      window.ipcRenderer.off('ai:chat-stream-error', onError);
       listenersReady.value = false;
     }
 
@@ -685,6 +968,7 @@ export function useAiAssistantChat() {
     error,
     isBusy,
     sendMessage,
+    respondToolApproval,
     abort,
     clear,
     createSession,

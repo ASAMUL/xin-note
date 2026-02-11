@@ -7,7 +7,7 @@ import { escapeSqlString, whereEqString } from './utils';
 const MAX_CHUNKS_PER_WRITE = 20_000;
 const RAG_DOC_ID_COLUMN = 'docid';
 
-function normalizeChunkRows(chunks: RagChunkInput[], hasVector: boolean) {
+function normalizeChunkRows(chunks: Record<string, unknown>[], hasVector: boolean) {
   // 统一字段名，避免 schema 推断不稳定（同时适配表字段全小写）
   return (chunks || []).map((c) => ({
     docid: String(c.docid || ''),
@@ -40,7 +40,7 @@ export async function ragDeleteByDocId(docId: string, options: RagTableOptions =
  */
 export async function ragRebuildDocChunks(
   docId: string,
-  chunks: RagChunkInput[],
+  chunks: Record<string, unknown>[],
   options: RagTableOptions = {},
 ) {
   const id = (docId || '').trim();
@@ -68,7 +68,10 @@ export async function ragRebuildDocChunks(
 /**
  * 批量写入 chunks（append）
  */
-export async function ragAddChunks(chunks: RagChunkInput[], options: RagTableOptions = {}) {
+export async function ragAddChunks(
+  chunks: Record<string, unknown>[],
+  options: RagTableOptions = {},
+) {
   if ((chunks?.length || 0) > MAX_CHUNKS_PER_WRITE) {
     throw new Error(`单次写入 chunks 过多（>${MAX_CHUNKS_PER_WRITE}），请拆分后再写入`);
   }
@@ -102,4 +105,3 @@ export async function ragOptimize(options: RagTableOptions = {}) {
 export function unsafeWhereLiteral(value: string) {
   return `'${escapeSqlString(value)}'`;
 }
-

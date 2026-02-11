@@ -1,4 +1,4 @@
-﻿import type { IpcMainInvokeEvent } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import { ipcMain } from 'electron';
 
 import type { LanguageModel, UIMessage } from 'ai';
@@ -8,6 +8,7 @@ import {
   createGateway,
   gateway as defaultGateway,
   generateText,
+  stepCountIs,
   streamText,
 } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -16,6 +17,9 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
+import { buildAgentSystemPrompt } from '../ai/prompt/commonAgent';
+import { createDefaultAgentTools } from '../ai/tools/defaultTool';
+import { createNoteToolService, type ToolApprovalDecision } from './ai-tools/note-tools';
 import { parseAiBaseUrl, toOpenAiRequestBaseUrl } from '../utils/ai/baseUrl';
 
 export interface AiRuntimeSettings {
@@ -40,6 +44,12 @@ export interface AiChatStreamStartRequest {
   settings: AiRuntimeSettings;
   messages: Array<Omit<UIMessage, 'id'>>;
   system?: string;
+}
+
+export interface AiToolApprovalRespondRequest {
+  approvalId: string;
+  approved: boolean;
+  reason?: string;
 }
 
 export interface AiModelsListRequest {
@@ -239,6 +249,30 @@ function resolveLanguageModel(settings: AiRuntimeSettings): LanguageModel {
 
 // ========== 流式会话管理 ==========
 const activeStreams = new Map<string, AbortController>();
+const TOOL_APPROVAL_TIMEOUT_MS = 60_000;
+
+const DEFAULT_AGENT_TOOL_LIST = [
+  '- searchNotes(query, filters, topK): 检索相关笔记片段',
+  '- getNote(noteId, block?): 读取整篇笔记或指定区块',
+  '- createNote(title, content): 创建新笔记（需要审批）',
+  '- replaceText(noteId, originalText, newText): 精准替换文本（需要审批）',
+  '- appendContent(noteId, content, targetHeading?): 结构化追加内容（需要审批）',
+].join('\n');
+
+interface PendingToolApproval {
+  approvalId: string;
+  streamId: string;
+  toolCallId: string;
+  toolName: string;
+  event: IpcMainInvokeEvent;
+  timer: NodeJS.Timeout;
+  abortCleanup: () => void;
+  resolve: (decision: ToolApprovalDecision) => void;
+  settled: boolean;
+}
+
+const pendingApprovals = new Map<string, PendingToolApproval>();
+const approvalIdsByStream = new Map<string, Set<string>>();
 
 function sendToRenderer(event: IpcMainInvokeEvent, channel: string, payload: any) {
   try {
@@ -252,6 +286,62 @@ function sendToRenderer(event: IpcMainInvokeEvent, channel: string, payload: any
 function serializeError(e: unknown): string {
   if (e instanceof Error) return e.message;
   return String(e || 'Unknown error');
+}
+
+function untrackApproval(streamId: string, approvalId: string) {
+  const set = approvalIdsByStream.get(streamId);
+  if (!set) return;
+  set.delete(approvalId);
+  if (set.size === 0) {
+    approvalIdsByStream.delete(streamId);
+  }
+}
+
+function trackApproval(streamId: string, approvalId: string) {
+  let set = approvalIdsByStream.get(streamId);
+  if (!set) {
+    set = new Set<string>();
+    approvalIdsByStream.set(streamId, set);
+  }
+  set.add(approvalId);
+}
+
+function settlePendingApproval(
+  approvalId: string,
+  decision: ToolApprovalDecision,
+  options?: {
+    sendEvent?: boolean;
+  },
+) {
+  const pending = pendingApprovals.get(approvalId);
+  if (!pending || pending.settled) return false;
+
+  pending.settled = true;
+  clearTimeout(pending.timer);
+  pending.abortCleanup();
+  pendingApprovals.delete(approvalId);
+  untrackApproval(pending.streamId, approvalId);
+  pending.resolve(decision);
+
+  if (options?.sendEvent !== false) {
+    sendToRenderer(pending.event, 'ai:chat-stream-tool-approval-response', {
+      streamId: pending.streamId,
+      approvalId: pending.approvalId,
+      toolCallId: pending.toolCallId,
+      toolName: pending.toolName,
+      approved: !!decision.approved,
+      reason: decision.reason || '',
+    });
+  }
+
+  return true;
+}
+
+function cancelApprovalsForStream(streamId: string, reason: string) {
+  const ids = Array.from(approvalIdsByStream.get(streamId) || []);
+  for (const approvalId of ids) {
+    settlePendingApproval(approvalId, { approved: false, reason });
+  }
 }
 
 export function setupAiIpc() {
@@ -320,6 +410,20 @@ export function setupAiIpc() {
     return (output?.suggestions ?? []).map((s) => (s || '').toString());
   });
 
+  // 写入工具审批回执（renderer -> main）
+  ipcMain.handle(
+    'ai:tool-approval-respond',
+    async (_event, payload: AiToolApprovalRespondRequest) => {
+      const approvalId = (payload?.approvalId || '').trim();
+      if (!approvalId) return false;
+
+      return settlePendingApproval(approvalId, {
+        approved: !!payload.approved,
+        reason: (payload?.reason || '').toString().trim() || undefined,
+      });
+    },
+  );
+
   // 侧边栏：启动流式生成
   ipcMain.handle('ai:chat-stream-start', async (event, req: AiChatStreamStartRequest) => {
     const model = resolveLanguageModel(req.settings);
@@ -376,14 +480,83 @@ export function setupAiIpc() {
     const controller = new AbortController();
     activeStreams.set(streamId, controller);
 
+    const requestWriteApproval = async (request: {
+      toolCallId: string;
+      toolName: 'createNote' | 'replaceText' | 'appendContent';
+      input: unknown;
+    }): Promise<ToolApprovalDecision> => {
+      const approvalId = nanoid();
+      const toolCallId = (request.toolCallId || '').trim();
+
+      return await new Promise<ToolApprovalDecision>((resolve) => {
+        const onAbort = () => {
+          settlePendingApproval(approvalId, {
+            approved: false,
+            reason: '用户已终止本次请求',
+          });
+        };
+        const timer = setTimeout(() => {
+          settlePendingApproval(approvalId, {
+            approved: false,
+            reason: '审批超时，已自动取消',
+          });
+        }, TOOL_APPROVAL_TIMEOUT_MS);
+
+        const pending: PendingToolApproval = {
+          approvalId,
+          streamId,
+          toolCallId,
+          toolName: request.toolName,
+          event,
+          timer,
+          settled: false,
+          abortCleanup: () => controller.signal.removeEventListener('abort', onAbort),
+          resolve,
+        };
+
+        pendingApprovals.set(approvalId, pending);
+        trackApproval(streamId, approvalId);
+        controller.signal.addEventListener('abort', onAbort, { once: true });
+
+        sendToRenderer(event, 'ai:chat-stream-tool-approval-request', {
+          streamId,
+          approvalId,
+          toolCallId,
+          toolName: request.toolName,
+          input: request.input,
+        });
+      });
+    };
+
+    const noteToolService = createNoteToolService({
+      streamId,
+      requestWriteApproval: async ({ toolCallId, toolName, input }) =>
+        await requestWriteApproval({
+          toolCallId,
+          toolName,
+          input,
+        }),
+    });
+    const tools = createDefaultAgentTools(noteToolService);
+
+    const agentSystemPrompt = buildAgentSystemPrompt({
+      toolList: DEFAULT_AGENT_TOOL_LIST,
+      operatingSystem: process.platform,
+    });
+    const mergedSystemPrompt = req.system
+      ? `${agentSystemPrompt}\n\n# 用户附加系统约束\n${req.system}`
+      : agentSystemPrompt;
+
     // 后台执行：通过 IPC push delta
     void (async () => {
       try {
         const modelMessages = await convertToModelMessages(req.messages);
         const result = streamText({
           model,
-          system: req.system,
+          system: mergedSystemPrompt,
           messages: modelMessages,
+          tools,
+          stopWhen: stepCountIs(8),
           abortSignal: controller.signal,
           providerOptions,
           // 开启 raw chunk 以便在部分提供商仅返回 reasoning_details 时做兜底解析
@@ -400,7 +573,7 @@ export function setupAiIpc() {
             const delta: any = (rawValue as any)?.choices?.[0]?.delta;
             if (!delta || typeof delta !== 'object') return '';
 
-            // OpenRouter 可能返回结构化 reasoning_details（AI SDK 目前不会解析这个字段）
+            // 思考内容可能返回结构化 reasoning_details（AI SDK 目前不会解析这个字段）
             const details = delta.reasoning_details;
             if (Array.isArray(details) && details.length > 0) {
               const out: string[] = [];
@@ -475,6 +648,41 @@ export function setupAiIpc() {
             continue;
           }
 
+          if (part.type === 'tool-call') {
+            sendToRenderer(event, 'ai:chat-stream-tool-call', {
+              streamId,
+              toolCallId: (part as any).toolCallId,
+              toolName: (part as any).toolName,
+              input: (part as any).input ?? (part as any).args ?? {},
+            });
+            continue;
+          }
+
+          if (part.type === 'tool-result') {
+            const output = (part as any).output;
+            const denied = !!(output && typeof output === 'object' && (output as any).denied);
+            sendToRenderer(event, 'ai:chat-stream-tool-result', {
+              streamId,
+              toolCallId: (part as any).toolCallId,
+              toolName: (part as any).toolName,
+              input: (part as any).input ?? {},
+              output,
+              denied,
+            });
+            continue;
+          }
+
+          if (part.type === 'tool-error') {
+            sendToRenderer(event, 'ai:chat-stream-tool-error', {
+              streamId,
+              toolCallId: (part as any).toolCallId,
+              toolName: (part as any).toolName,
+              input: (part as any).input ?? {},
+              errorText: serializeError((part as any).error),
+            });
+            continue;
+          }
+
           // raw chunk 兜底：用于解析 reasoning_details（当 SDK 没有产出 reasoning chunk 时）
           if (part.type === 'raw' && shouldRequestReasoning && !sdkReasoningSeen) {
             const delta = extractReasoningDeltaFromRaw((part as any).rawValue);
@@ -512,6 +720,7 @@ export function setupAiIpc() {
         }
         sendToRenderer(event, 'ai:chat-stream-error', { streamId, message: serializeError(e) });
       } finally {
+        cancelApprovalsForStream(streamId, '流已结束，审批自动取消');
         activeStreams.delete(streamId);
       }
     })();
@@ -523,6 +732,7 @@ export function setupAiIpc() {
     const controller = activeStreams.get(payload.streamId);
     if (controller) {
       controller.abort();
+      cancelApprovalsForStream(payload.streamId, '用户主动停止，审批已取消');
       activeStreams.delete(payload.streamId);
     }
     return true;

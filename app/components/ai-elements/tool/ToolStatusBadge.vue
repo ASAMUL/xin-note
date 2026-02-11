@@ -17,6 +17,19 @@ const props = defineProps<{
   state: ToolPart['state']
 }>()
 
+const safeState = computed<ToolPart['state']>(() => {
+  const allStates: ToolPart['state'][] = [
+    'input-streaming',
+    'input-available',
+    'approval-requested',
+    'approval-responded',
+    'output-available',
+    'output-error',
+    'output-denied',
+  ]
+  return allStates.includes(props.state) ? props.state : 'output-error'
+})
+
 const label = computed(() => {
   const labels: Record<ToolPart['state'], string> = {
     'input-streaming': 'Pending',
@@ -27,7 +40,7 @@ const label = computed(() => {
     'output-error': 'Error',
     'output-denied': 'Denied',
   }
-  return labels[props.state]
+  return labels[safeState.value]
 })
 
 const icon = computed<Component>(() => {
@@ -40,7 +53,7 @@ const icon = computed<Component>(() => {
     'output-error': XCircleIcon,
     'output-denied': XCircleIcon,
   }
-  return icons[props.state]
+  return icons[safeState.value]
 })
 
 const iconClass = computed(() => {
@@ -53,7 +66,7 @@ const iconClass = computed(() => {
     'output-error': 'size-4 text-red-600',
     'output-denied': 'size-4 text-orange-600',
   }
-  return classes[props.state]
+  return classes[safeState.value]
 })
 </script>
 

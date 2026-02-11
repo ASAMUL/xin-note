@@ -81,6 +81,10 @@ export function useTabs() {
     const existing = state.value.openTabs.find((tab) => tab.path === filePath);
     if (existing) {
       state.value.activeTabId = existing.id;
+      // 防御性刷新：历史异常时可能出现空内容缓存，命中已打开标签时主动回源一次。
+      if (!existing.content) {
+        void reloadTabContentByPath(existing.path);
+      }
       return existing;
     }
 
@@ -242,6 +246,9 @@ export function useTabs() {
     if (existingTab) {
       // 切换到已存在的标签页
       state.value.activeTabId = existingTab.id;
+      if (!existingTab.content) {
+        void reloadTabContentByPath(existingTab.path);
+      }
       return;
     }
 
@@ -420,6 +427,34 @@ export function useTabs() {
   };
 
   /**
+   * 根据文件路径重新加载已打开标签页内容
+   */
+  const reloadTabContentByPath = async (filePath: string): Promise<boolean> => {
+    if (!window.ipcRenderer) return false;
+    const targetKey = normalizePathForCompare(filePath);
+    const targets = state.value.openTabs.filter(
+      (tab) => normalizePathForCompare(tab.path) === targetKey,
+    );
+    if (targets.length === 0) return false;
+
+    try {
+      const content = ((await window.ipcRenderer.invoke('file-read', filePath)) || '').toString();
+      const fileStat = await window.ipcRenderer.invoke('file-stat', filePath);
+
+      for (const tab of targets) {
+        tab.content = content;
+        tab.isModified = false;
+        if (fileStat?.createdAt) tab.createdAt = fileStat.createdAt;
+        if (fileStat?.modifiedAt) tab.modifiedAt = fileStat.modifiedAt;
+      }
+      return true;
+    } catch (error) {
+      console.error('重载标签页内容失败:', error);
+      return false;
+    }
+  };
+
+  /**
    * 在资源管理器中显示
    */
   const showTabInExplorer = async (tabId: string) => {
@@ -462,6 +497,7 @@ export function useTabs() {
     saveTab,
     showTabInExplorer,
     copyTabPath,
+    reloadTabContentByPath,
     closeTabByPath,
     renameTabByPath,
     renameTabsByFolder,

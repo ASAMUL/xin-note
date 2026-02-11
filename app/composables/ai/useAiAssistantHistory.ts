@@ -1,4 +1,4 @@
-﻿import type { UIMessage } from 'ai';
+import type { UIMessage } from 'ai';
 
 import type {
   AiAssistantMessage,
@@ -8,6 +8,7 @@ import type {
   AiAssistantSessionGroup,
   AiAssistantSessionGroupKey,
 } from '~/types/ai-assistant';
+import { toJsonSafeValue } from '~/utils/serialization/ipcSafe';
 
 const HISTORY_FILE_NAME = 'ai-assistant-history.json';
 const HISTORY_VERSION = 2;
@@ -33,6 +34,27 @@ type PersistedMessagePart =
       url: string;
       mediaType: string;
       filename?: string;
+    }
+  | {
+      type: 'dynamic-tool';
+      toolName: string;
+      toolCallId: string;
+      input: Record<string, any>;
+      output?: unknown;
+      errorText?: string;
+      state?:
+        | 'input-streaming'
+        | 'input-available'
+        | 'approval-requested'
+        | 'approval-responded'
+        | 'output-available'
+        | 'output-error'
+        | 'output-denied';
+      approval?: {
+        id: string;
+        approved?: boolean;
+        reason?: string;
+      };
     };
 
 interface PersistedMessage {
@@ -104,46 +126,119 @@ function sanitizeSources(raw: unknown): AiAssistantRagSource[] | undefined {
 function sanitizeMessageParts(raw: unknown): PersistedMessagePart[] {
   if (!Array.isArray(raw)) return [];
 
-  return raw
-    .map((part) => {
+  const parsed = raw
+    .map<PersistedMessagePart | null>((part) => {
       if (!part || typeof part !== 'object') return null;
+      const item = part as any;
 
-      if (part.type === 'text' || part.type === 'reasoning') {
+      if (item.type === 'text' || item.type === 'reasoning') {
         return {
-          type: part.type,
-          text: (part.text || '').toString(),
-          state: part.state === 'streaming' ? 'streaming' : part.state === 'done' ? 'done' : undefined,
+          type: item.type,
+          text: (item.text || '').toString(),
+          state:
+            item.state === 'streaming' ? 'streaming' : item.state === 'done' ? 'done' : undefined,
         } satisfies PersistedMessagePart;
       }
 
-      if (part.type === 'file') {
+      if (item.type === 'file') {
         return {
           type: 'file',
-          url: (part.url || '').toString(),
-          mediaType: (part.mediaType || '').toString(),
-          filename: part.filename ? part.filename.toString() : undefined,
+          url: (item.url || '').toString(),
+          mediaType: (item.mediaType || '').toString(),
+          filename: item.filename ? item.filename.toString() : undefined,
+        } satisfies PersistedMessagePart;
+      }
+
+      if (item.type === 'dynamic-tool') {
+        const toolName = (item.toolName || '').toString().trim();
+        const toolCallId = (item.toolCallId || '').toString().trim();
+        if (!toolName || !toolCallId) {
+          return null;
+        }
+
+        const toolStates = [
+          'input-streaming',
+          'input-available',
+          'approval-requested',
+          'approval-responded',
+          'output-available',
+          'output-error',
+          'output-denied',
+        ] as const;
+
+        const state = (
+          toolStates
+        ).includes(item.state as any)
+          ? (item.state as (typeof toolStates)[number])
+          : 'input-available';
+
+        const approval =
+          item.approval && typeof item.approval === 'object' && typeof item.approval.id === 'string'
+            ? {
+                id: item.approval.id,
+                approved:
+                  typeof item.approval.approved === 'boolean'
+                    ? item.approval.approved
+                    : undefined,
+                reason: typeof item.approval.reason === 'string' ? item.approval.reason : undefined,
+              }
+            : undefined;
+
+        const safeInput = toJsonSafeValue(item.input ?? {});
+        const safeOutput = toJsonSafeValue(item.output);
+
+        return {
+          type: 'dynamic-tool',
+          toolName,
+          toolCallId,
+          input:
+            safeInput && typeof safeInput === 'object' && !Array.isArray(safeInput)
+              ? (safeInput as Record<string, any>)
+              : {},
+          output: safeOutput,
+          errorText:
+            typeof item.errorText === 'string' && item.errorText.trim().length > 0
+              ? item.errorText
+              : undefined,
+          state,
+          approval,
         } satisfies PersistedMessagePart;
       }
 
       return null;
     })
-    .filter((part): part is PersistedMessagePart => !!part);
+    .filter((part): part is PersistedMessagePart => part !== null);
+
+  // 同一条消息里 dynamic-tool 的 toolCallId 视为唯一键，避免重复 key 触发渲染异常。
+  const seenToolCallIds = new Set<string>();
+  const deduped: PersistedMessagePart[] = [];
+  for (const part of parsed) {
+    if (part.type !== 'dynamic-tool') {
+      deduped.push(part);
+      continue;
+    }
+    if (seenToolCallIds.has(part.toolCallId)) continue;
+    seenToolCallIds.add(part.toolCallId);
+    deduped.push(part);
+  }
+  return deduped;
 }
 
 function normalizeMessage(raw: unknown): AiAssistantMessage | null {
   if (!raw || typeof raw !== 'object') return null;
+  const item = raw as any;
 
-  const role = raw.role;
+  const role = item.role;
   if (role !== 'system' && role !== 'user' && role !== 'assistant') {
     return null;
   }
 
-  const parts = sanitizeMessageParts(raw.parts);
+  const parts = sanitizeMessageParts(item.parts);
   if (parts.length === 0) {
     return null;
   }
 
-  const meta = raw.metadata as Partial<AiAssistantMessageMeta> | undefined;
+  const meta = item.metadata as Partial<AiAssistantMessageMeta> | undefined;
 
   const metadata: AiAssistantMessageMeta = {
     createdAt: normalizeDateString(meta?.createdAt),
@@ -155,7 +250,7 @@ function normalizeMessage(raw: unknown): AiAssistantMessage | null {
   };
 
   return {
-    id: typeof raw.id === 'string' && raw.id.trim().length > 0 ? raw.id : createId('msg'),
+    id: typeof item.id === 'string' && item.id.trim().length > 0 ? item.id : createId('msg'),
     role,
     parts: parts as any,
     metadata,
@@ -197,21 +292,39 @@ export function createEmptySession(seed?: Partial<AiAssistantSession>): AiAssist
 
 function normalizeSession(raw: unknown): AiAssistantSession | null {
   if (!raw || typeof raw !== 'object') return null;
+  const item = raw as any;
 
-  const messagesRaw = Array.isArray(raw.messages) ? raw.messages : [];
+  const messagesRaw: unknown[] = Array.isArray(item.messages) ? item.messages : [];
   const messages = messagesRaw
     .map((message) => normalizeMessage(message))
     .filter((message): message is AiAssistantMessage => !!message);
 
-  const createdAt = normalizeDateString(raw.createdAt);
-  const updatedAt = normalizeDateString(raw.updatedAt || createdAt);
+  const messageIdSet = new Set<string>();
+  const normalizedMessages = messages.map((message, index) => {
+    const baseId = (message.id || '').toString().trim() || createId('msg');
+    let nextId = baseId;
+    if (messageIdSet.has(nextId)) {
+      let suffix = 1;
+      while (messageIdSet.has(`${baseId}-${suffix}`)) suffix += 1;
+      nextId = `${baseId}-${suffix}`;
+    }
+    messageIdSet.add(nextId);
+    if (nextId === message.id) return message;
+    return {
+      ...message,
+      id: nextId || `msg-${index}`,
+    };
+  });
+
+  const createdAt = normalizeDateString(item.createdAt);
+  const updatedAt = normalizeDateString(item.updatedAt || createdAt);
 
   return {
-    id: typeof raw.id === 'string' && raw.id.trim().length > 0 ? raw.id : createId('session'),
-    title: normalizeSessionTitle(raw.title || inferSessionTitle(messages)),
+    id: typeof item.id === 'string' && item.id.trim().length > 0 ? item.id : createId('session'),
+    title: normalizeSessionTitle(item.title || inferSessionTitle(messages)),
     createdAt,
     updatedAt,
-    messages,
+    messages: normalizedMessages,
   };
 }
 
@@ -257,10 +370,10 @@ function buildStorePayload(state: AiAssistantHistoryState): PersistedHistoryStor
 }
 
 function migrateLegacyHistory(raw: PersistedLegacyHistory | PersistedMessage[] | null): AiAssistantHistoryState {
-  const messagesRaw = Array.isArray(raw)
+  const messagesRaw: unknown[] = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as PersistedLegacyHistory | null)?.messages)
-      ? (raw as PersistedLegacyHistory).messages
+      ? ((raw as PersistedLegacyHistory).messages as unknown[])
       : [];
 
   const messages = messagesRaw
@@ -318,7 +431,8 @@ export function useAiAssistantHistory() {
     if (!window.ipcRenderer) return false;
 
     try {
-      const payload = buildStorePayload(state);
+      // Electron IPC 使用 structured clone；先转成纯 JSON 结构，避免 Proxy/循环引用导致保存失败。
+      const payload = toJsonSafeValue(buildStorePayload(state)) as PersistedHistoryStore;
       const ok = await window.ipcRenderer.invoke('config-write', {
         fileName: HISTORY_FILE_NAME,
         data: payload,
