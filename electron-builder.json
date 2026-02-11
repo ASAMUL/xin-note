@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "cn.illumine.note.cn",
-  "productName": "illumine",
+  "appId": "cn.xin.note.cn",
+  "productName": "xin-note",
   "asar": true,
   "asarUnpack": ["**/*.node"],
   "directories": {
@@ -18,9 +18,11 @@
   ],
   "mac": {
     "artifactName": "${productName}_${version}.${ext}",
+    "icon": "public/application/icons/xin-note-icon.icns",
     "target": ["dmg"]
   },
   "win": {
+    "icon": "public/application/icons/xin-note-icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -34,9 +36,11 @@
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false,
+    "installerIcon": "public/application/icons/xin-note-icon.ico",
+    "uninstallerIcon": "public/application/icons/xin-note-icon.ico",
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "illumine",
+    "shortcutName": "xin-note",
     "guid": "xxxx-xxxx-xxxx-xxx1"
   }
 }

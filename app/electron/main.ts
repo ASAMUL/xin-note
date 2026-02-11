@@ -46,7 +46,29 @@ process.env.VITE_PUBLIC = process.env.VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
+const APP_USER_MODEL_ID = 'cn.xin.note.cn';
+
 let win: BrowserWindow | null;
+
+function resolveAppIconPath() {
+  const baseDir = process.env.VITE_PUBLIC;
+  if (!baseDir) return undefined;
+
+  const iconFileName =
+    process.platform === 'win32'
+      ? 'xin-note-icon.ico'
+      : process.platform === 'darwin'
+      ? 'xin-note-icon.icns'
+      : 'xin-note-icon.png';
+
+  const iconPath = path.join(baseDir, 'application', 'icons', iconFileName);
+  if (!existsSync(iconPath)) {
+    console.warn('[icon] icon not found:', iconPath);
+    return undefined;
+  }
+
+  return iconPath;
+}
 
 function registerAssetProtocol() {
   // 兜底解析缓存：key = 请求的 absPath，value = 找到的替代路径（或 null 表示找不到）
@@ -152,12 +174,14 @@ function createWindow() {
   const { width: screenWidth, height: screenHeight } = display.workAreaSize;
   const width = Math.max(800, Math.round(screenWidth * 0.8));
   const height = Math.max(600, Math.round(screenHeight * 0.8));
+  const icon = resolveAppIconPath();
 
   win = new BrowserWindow({
     width,
     height,
     minWidth: 800,
     minHeight: 600,
+    icon,
     frame: false,
     transparent: true,
     center: true,
@@ -388,6 +412,11 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
+  // Windows 推荐将 AUMID 设置为 appId，确保任务栏/通知等系统集成行为正确。
+  if (process.platform === 'win32') {
+    app.setAppUserModelId(APP_USER_MODEL_ID);
+  }
+
   registerAssetProtocol();
   initIpc();
   createWindow();
