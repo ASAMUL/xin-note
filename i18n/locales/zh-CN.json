@@ -172,5 +172,74 @@
       "notes": "笔记",
       "ai": "AI 配置"
     }
+  },
+  "aiAssistant": {
+    "error": {
+      "actions": {
+        "viewDetail": "查看详情"
+      },
+      "detailModal": {
+        "title": "错误详情",
+        "empty": "暂无错误详情。"
+      },
+      "categories": {
+        "abort": "用户取消",
+        "config": "配置错误",
+        "network": "网络异常",
+        "auth": "鉴权失败",
+        "permission": "权限不足",
+        "region": "地区限制",
+        "model": "模型不可用",
+        "rate-limit": "频率/额度限制",
+        "service": "服务异常",
+        "unknown": "未知错误"
+      },
+      "titles": {
+        "abort": "本次生成已停止",
+        "config": "AI 配置不完整",
+        "network": "网络连接失败",
+        "auth": "鉴权失败",
+        "permission": "无访问权限",
+        "region": "模型受地区限制",
+        "model": "模型不可用",
+        "rate-limit": "请求频率或额度受限",
+        "service": "AI 服务暂时不可用",
+        "unknown": "请求失败"
+      },
+      "summaries": {
+        "abort": "你已停止本次生成。",
+        "emptyResponse": "AI 未返回有效内容，请重试。",
+        "config": "请检查 API Key、Base URL 和模型配置后重试。",
+        "network": "无法连接 AI 服务，请检查网络和 Base URL 后重试。",
+        "auth": "API Key 无效，或当前账号未通过鉴权。",
+        "permission": "当前账号没有访问该模型或接口的权限。",
+        "region": "当前模型在你所在地区不可用，请切换模型或服务商后重试。",
+        "model": "模型不存在或当前服务不支持该模型，请检查模型 ID。",
+        "rate-limit": "请求过于频繁或额度不足，请稍后再试。",
+        "service": "服务端暂时异常，请稍后重试。",
+        "unknown": "请求失败，请稍后重试或查看错误详情。"
+      },
+      "detail": {
+        "yes": "是",
+        "no": "否",
+        "none": "无",
+        "sections": {
+          "time": "时间：{value}",
+          "category": "分类：{value}",
+          "summary": "简要：{value}",
+          "rawMessage": "原始消息：{value}",
+          "statusCode": "HTTP 状态码：{value}",
+          "code": "错误码：{value}",
+          "requestUrl": "请求 URL：{value}",
+          "model": "模型：{value}",
+          "retryable": "服务端标记可重试：{value}",
+          "responseBody": "响应体：\n{value}",
+          "data": "错误数据：\n{value}",
+          "requestBody": "请求参数：\n{value}",
+          "responseHeaders": "响应头：\n{value}",
+          "stack": "堆栈：\n{value}"
+        }
+      }
+    }
   }
 }

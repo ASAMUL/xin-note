@@ -7,13 +7,14 @@ import type {
   AiAssistantMessageMeta,
   AiAssistantSession,
 } from '~/types/ai-assistant';
-import { normalizeAiError } from '~/utils/ai/normalizeAiError';
+import { normalizeAiError, normalizeAiErrorDetail } from '~/utils/ai/normalizeAiError';
 
 import {
   buildSessionTitleFromFirstMessage,
   createEmptySession,
   useAiAssistantHistory,
 } from './useAiAssistantHistory';
+import { useAiAssistantErrorLog } from './useAiAssistantErrorLog';
 import { useAiAssistantRag } from './useAiAssistantRag';
 import { useAiRoleModel } from './useAiRoleModel';
 import { useNotes } from '../useNotes';
@@ -54,11 +55,18 @@ function sortSessionsByUpdatedAt(sessions: AiAssistantSession[]) {
 }
 
 export function useAiAssistantChat() {
+  const { t } = useI18n();
+
   const { aiApiKey, aiBaseUrl, modelId, resolved } = useAiRoleModel('chat');
   const { searchNotes } = useAiAssistantRag();
   const { loadState, scheduleSave, flushSave, groupSessionsByDate } = useAiAssistantHistory();
+  const { pushErrorLog } = useAiAssistantErrorLog();
   const { loadNotes } = useNotes();
   const { reloadTabContentByPath } = useTabs();
+
+  const translateAiError = (key: string, params?: Record<string, unknown>) => {
+    return t(key, params as any);
+  };
 
   const sessions = useState<AiAssistantSession[]>('ai-assistant:sessions', () => []);
   const activeSessionId = useState<string | null>('ai-assistant:active-session-id', () => null);
@@ -335,11 +343,16 @@ export function useAiAssistantChat() {
   };
 
   const applyAssistantError = (sessionId: string, assistantId: string, rawError: unknown) => {
-    const normalizedError = normalizeAiError(rawError);
-    error.value = normalizedError;
+    const normalizedError = normalizeAiErrorDetail(rawError, translateAiError);
+    error.value = normalizedError.summary;
     status.value = 'error';
+    pushErrorLog(normalizedError);
 
-    setAssistantText(sessionId, assistantId, normalizedError, 'done');
+    setAssistantMeta(sessionId, assistantId, {
+      error: normalizedError,
+    });
+
+    setAssistantText(sessionId, assistantId, normalizedError.summary, 'done');
     markAssistantPartsDone(sessionId, assistantId);
   };
 
@@ -378,8 +391,25 @@ export function useAiAssistantChat() {
     });
   };
 
+  const isIncomingActiveStream = (streamId: string | null | undefined) => {
+    if (!streamId) return false;
+    if (activeStreamId.value) {
+      return streamId === activeStreamId.value;
+    }
+
+    const canAttach =
+      !!activeStreamSessionId.value &&
+      !!activeAssistantId.value &&
+      (status.value === 'submitted' || status.value === 'streaming');
+    if (!canAttach) return false;
+
+    // 处理竞态：streamId 可能在 invoke 返回前就有事件到达。
+    activeStreamId.value = streamId;
+    return true;
+  };
+
   const onDelta = (_event: unknown, payload: { streamId: string; delta: string }) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value) return;
+    if (!isIncomingActiveStream(payload?.streamId)) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -390,7 +420,7 @@ export function useAiAssistantChat() {
   };
 
   const onReasoningStart = (_event: unknown, payload: { streamId: string; id: string }) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.id) return;
+    if (!isIncomingActiveStream(payload?.streamId) || !payload?.id) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -403,7 +433,7 @@ export function useAiAssistantChat() {
     _event: unknown,
     payload: { streamId: string; id: string; delta: string },
   ) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.id) return;
+    if (!isIncomingActiveStream(payload?.streamId) || !payload?.id) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -416,7 +446,7 @@ export function useAiAssistantChat() {
   };
 
   const onReasoningEnd = (_event: unknown, payload: { streamId: string; id: string }) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.id) return;
+    if (!isIncomingActiveStream(payload?.streamId) || !payload?.id) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -434,8 +464,7 @@ export function useAiAssistantChat() {
       input: Record<string, any>;
     },
   ) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.toolCallId)
-      return;
+    if (!isIncomingActiveStream(payload?.streamId) || !payload?.toolCallId) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -461,8 +490,7 @@ export function useAiAssistantChat() {
     },
   ) => {
     if (
-      !payload?.streamId ||
-      payload.streamId !== activeStreamId.value ||
+      !isIncomingActiveStream(payload?.streamId) ||
       !payload?.toolCallId ||
       !payload?.approvalId
     ) {
@@ -497,8 +525,7 @@ export function useAiAssistantChat() {
     },
   ) => {
     if (
-      !payload?.streamId ||
-      payload.streamId !== activeStreamId.value ||
+      !isIncomingActiveStream(payload?.streamId) ||
       !payload?.toolCallId ||
       !payload?.approvalId
     ) {
@@ -532,8 +559,7 @@ export function useAiAssistantChat() {
       denied?: boolean;
     },
   ) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.toolCallId)
-      return;
+    if (!isIncomingActiveStream(payload?.streamId) || !payload?.toolCallId) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -572,8 +598,7 @@ export function useAiAssistantChat() {
       errorText: string;
     },
   ) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value || !payload?.toolCallId)
-      return;
+    if (!isIncomingActiveStream(payload?.streamId) || !payload?.toolCallId) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
@@ -589,18 +614,37 @@ export function useAiAssistantChat() {
   };
 
   const onEnd = async (_event: unknown, payload: { streamId: string }) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value) return;
+    if (!isIncomingActiveStream(payload?.streamId)) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
+    let shouldKeepErrorState = false;
 
     if (sessionId && assistantId) {
       setAssistantText(sessionId, assistantId, activeText.value, 'done');
       markAssistantPartsDone(sessionId, assistantId);
+
+      const session = getSessionById(sessionId);
+      const assistantMessage = session?.messages.find((message) => message.id === assistantId);
+      const parts = Array.isArray(assistantMessage?.parts) ? assistantMessage.parts : [];
+      const hasNonTextPart = parts.some((part: any) => part?.type !== 'text');
+      const textContent = parts
+        .filter((part: any) => part?.type === 'text')
+        .map((part: any) => (part?.text || '').toString())
+        .join('')
+        .trim();
+
+      // 兜底：如果流结束后仍是“仅空文本”，按失败处理，避免界面静默无反馈。
+      if (!hasNonTextPart && textContent.length === 0) {
+        shouldKeepErrorState = true;
+        applyAssistantError(sessionId, assistantId, 'ai_empty_response');
+      }
     }
 
     resetActiveStreamState();
-    status.value = 'ready';
+    if (!shouldKeepErrorState) {
+      status.value = 'ready';
+    }
 
     await flushSave({
       sessions: sessions.value,
@@ -608,16 +652,22 @@ export function useAiAssistantChat() {
     });
   };
 
-  const onError = async (_event: unknown, payload: { streamId: string; message: string }) => {
-    if (!payload?.streamId || payload.streamId !== activeStreamId.value) return;
+  const onError = async (
+    _event: unknown,
+    payload: { streamId: string; message: string; detail?: unknown },
+  ) => {
+    if (!isIncomingActiveStream(payload?.streamId)) return;
 
     const sessionId = activeStreamSessionId.value;
     const assistantId = activeAssistantId.value;
+    const errorPayload = payload.detail ?? payload.message ?? '请求失败';
 
     if (sessionId && assistantId) {
-      applyAssistantError(sessionId, assistantId, payload.message || '请求失败');
+      applyAssistantError(sessionId, assistantId, errorPayload);
     } else {
-      error.value = normalizeAiError(payload.message || '请求失败');
+      const normalizedError = normalizeAiErrorDetail(errorPayload, translateAiError);
+      pushErrorLog(normalizedError);
+      error.value = normalizedError.summary;
       status.value = 'error';
     }
 
@@ -744,7 +794,7 @@ export function useAiAssistantChat() {
       });
       return !!ok;
     } catch (approvalError) {
-      error.value = normalizeAiError(approvalError);
+      error.value = normalizeAiError(approvalError, translateAiError);
       return false;
     }
   };

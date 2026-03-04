@@ -172,5 +172,74 @@
       "notes": "Notes",
       "ai": "AI"
     }
+  },
+  "aiAssistant": {
+    "error": {
+      "actions": {
+        "viewDetail": "View Details"
+      },
+      "detailModal": {
+        "title": "Error Details",
+        "empty": "No error details."
+      },
+      "categories": {
+        "abort": "Cancelled",
+        "config": "Configuration Error",
+        "network": "Network Error",
+        "auth": "Authentication Failed",
+        "permission": "Permission Denied",
+        "region": "Region Restriction",
+        "model": "Model Unavailable",
+        "rate-limit": "Rate Limit / Quota",
+        "service": "Service Error",
+        "unknown": "Unknown Error"
+      },
+      "titles": {
+        "abort": "Generation Stopped",
+        "config": "AI Configuration Incomplete",
+        "network": "Network Connection Failed",
+        "auth": "Authentication Failed",
+        "permission": "Access Denied",
+        "region": "Model Unavailable in Region",
+        "model": "Model Unavailable",
+        "rate-limit": "Rate Limit or Quota Exceeded",
+        "service": "AI Service Temporarily Unavailable",
+        "unknown": "Request Failed"
+      },
+      "summaries": {
+        "abort": "This generation was stopped.",
+        "emptyResponse": "AI returned no usable content. Please try again.",
+        "config": "Please check API Key, Base URL, and model settings, then try again.",
+        "network": "Unable to connect to AI service. Please check network and Base URL.",
+        "auth": "API Key is invalid, or the account is not authenticated.",
+        "permission": "Current account does not have permission to access this model or endpoint.",
+        "region": "This model is not available in your region. Switch model or provider and try again.",
+        "model": "Model does not exist or is not supported by current provider. Please check model ID.",
+        "rate-limit": "Too many requests or quota exceeded. Please try again later.",
+        "service": "Service is temporarily unavailable. Please retry later.",
+        "unknown": "Request failed. Please try again or view error details."
+      },
+      "detail": {
+        "yes": "Yes",
+        "no": "No",
+        "none": "None",
+        "sections": {
+          "time": "Time: {value}",
+          "category": "Category: {value}",
+          "summary": "Summary: {value}",
+          "rawMessage": "Raw message: {value}",
+          "statusCode": "HTTP status: {value}",
+          "code": "Error code: {value}",
+          "requestUrl": "Request URL: {value}",
+          "model": "Model: {value}",
+          "retryable": "Retryable (provider flag): {value}",
+          "responseBody": "Response body:\n{value}",
+          "data": "Error data:\n{value}",
+          "requestBody": "Request payload:\n{value}",
+          "responseHeaders": "Response headers:\n{value}",
+          "stack": "Stack trace:\n{value}"
+        }
+      }
+    }
   }
 }

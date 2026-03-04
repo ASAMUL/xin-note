@@ -2,6 +2,7 @@
 import type { DynamicToolUIPart } from 'ai';
 import type { PromptInputMessage } from '~/components/ai-elements/prompt-input';
 import type {
+  AiAssistantErrorInfo,
   AiAssistantMessage,
   AiAssistantMessageMeta,
   AiAssistantRagSource,
@@ -58,7 +59,9 @@ import {
 } from '~/components/ai-elements/confirmation';
 
 import AiAssistantChatModelPicker from '~/components/ai-assistant/AiAssistantChatModelPicker.vue';
+import AiAssistantErrorNotice from '~/components/ai-assistant/AiAssistantErrorNotice.vue';
 import { useAiAssistantChat } from '~/composables/ai/useAiAssistantChat';
+import { useAiAssistantErrorLog } from '~/composables/ai/useAiAssistantErrorLog';
 
 const {
   resolved,
@@ -68,6 +71,7 @@ const {
   activeSessionId,
   activeSessionTitle,
   status,
+  error: chatError,
   isBusy,
   sendMessage,
   respondToolApproval,
@@ -78,7 +82,13 @@ const {
   deleteSession,
 } = useAiAssistantChat();
 
+const { locale } = useI18n();
+const { errorLogs } = useAiAssistantErrorLog();
+
 const historyOpen = ref(false);
+const errorDetailOpen = ref(false);
+const activeErrorDetail = ref<AiAssistantErrorInfo | null>(null);
+const latestErrorLog = computed(() => errorLogs.value[0] || null);
 
 const quickSuggestions = [
   '帮我把这段内容润色得更自然一些。',
@@ -110,6 +120,27 @@ const getMessageSources = (message: AiAssistantMessage): AiAssistantRagSource[] 
 const getRagWarning = (message: AiAssistantMessage) => {
   const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
   return typeof metadata.ragWarning === 'string' ? metadata.ragWarning : '';
+};
+
+const getMessageError = (message: AiAssistantMessage): AiAssistantErrorInfo | null => {
+  const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
+  const error = metadata.error;
+  if (!error || typeof error !== 'object') return null;
+  if (typeof error.summary !== 'string' || error.summary.trim().length === 0) return null;
+  return error as AiAssistantErrorInfo;
+};
+
+const openErrorDetail = (message: AiAssistantMessage) => {
+  const messageError = getMessageError(message);
+  if (!messageError) return;
+  activeErrorDetail.value = messageError;
+  errorDetailOpen.value = true;
+};
+
+const openLatestErrorDetail = () => {
+  if (!latestErrorLog.value) return;
+  activeErrorDetail.value = latestErrorLog.value;
+  errorDetailOpen.value = true;
 };
 
 type AssistantToolApproval = {
@@ -419,7 +450,8 @@ const getSessionPreview = (session: AiAssistantSession) => {
 const formatSessionTime = (session: AiAssistantSession) => {
   const date = new Date(session.updatedAt);
   if (Number.isNaN(date.getTime())) return '--';
-  return new Intl.DateTimeFormat('zh-CN', {
+  const localeValue = locale.value === 'en' ? 'en-US' : 'zh-CN';
+  return new Intl.DateTimeFormat(localeValue, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -495,6 +527,35 @@ const handleDeleteSession = async (sessionId: string) => {
           @click="clear"
         />
       </div>
+    </div>
+
+    <div
+      v-if="chatError"
+      class="mx-4 mt-3 rounded-md px-3 py-2 flex items-start justify-between gap-3"
+      style="
+        background-color: var(--color-error-bg-subtle);
+        border: 1px solid var(--color-error-bg);
+      "
+    >
+      <div class="min-w-0">
+        <div class="text-xs font-semibold" style="color: var(--color-error)">
+          {{ $t('aiAssistant.error.titles.unknown') }}
+        </div>
+        <div class="text-xs mt-0.5 whitespace-pre-wrap wrap-break-word" style="color: var(--text-main)">
+          {{ chatError }}
+        </div>
+      </div>
+
+      <UButton
+        v-if="latestErrorLog"
+        size="xs"
+        variant="soft"
+        color="neutral"
+        icon="i-lucide-file-warning"
+        @click="openLatestErrorDetail"
+      >
+        {{ $t('aiAssistant.error.actions.viewDetail') }}
+      </UButton>
     </div>
 
     <div class="flex-1 min-h-0 overflow-hidden">
@@ -673,6 +734,12 @@ const handleDeleteSession = async (sessionId: string) => {
 
                 <MessageResponse :content="getMessageText(message)" />
 
+                <AiAssistantErrorNotice
+                  v-if="getMessageError(message)"
+                  :error="getMessageError(message)"
+                  @view-detail="openErrorDetail(message)"
+                />
+
                 <Sources v-if="getMessageSources(message).length > 0" class="mt-3">
                   <SourcesTrigger :count="getMessageSources(message).length">
                     <span>引用来源（{{ getMessageSources(message).length }}）</span>
@@ -708,7 +775,7 @@ const handleDeleteSession = async (sessionId: string) => {
               </template>
 
               <template v-else>
-                <div class="whitespace-pre-wrap break-words">
+                <div class="whitespace-pre-wrap wrap-break-word">
                   {{ getMessageText(message) }}
                 </div>
               </template>
@@ -840,6 +907,41 @@ const handleDeleteSession = async (sessionId: string) => {
               </QueueSectionContent>
             </QueueSection>
           </Queue>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal v-model:open="errorDetailOpen">
+      <template #content>
+        <div class="p-4 w-[760px] max-w-[96vw]">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="text-sm font-semibold leading-5" style="color: var(--text-main)">
+                {{ activeErrorDetail?.title || $t('aiAssistant.error.detailModal.title') }}
+              </h3>
+              <p class="text-xs mt-1 leading-5 whitespace-pre-wrap wrap-break-word" style="color: var(--text-mute)">
+                {{ activeErrorDetail?.summary || $t('aiAssistant.error.detailModal.empty') }}
+              </p>
+            </div>
+            <UButton
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              icon="i-lucide-x"
+              @click="errorDetailOpen = false"
+            />
+          </div>
+
+          <div
+            class="mt-3 rounded-md p-3 max-h-[58vh] overflow-auto whitespace-pre-wrap wrap-break-word text-xs leading-5 font-mono"
+            style="
+              background-color: var(--bg-main);
+              border: 1px solid var(--border-color);
+              color: var(--text-main);
+            "
+          >
+            {{ activeErrorDetail?.detail || $t('aiAssistant.error.detailModal.empty') }}
+          </div>
         </div>
       </template>
     </UModal>

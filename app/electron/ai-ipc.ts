@@ -21,6 +21,7 @@ import { buildAgentSystemPrompt } from '../ai/prompt/commonAgent';
 import { createDefaultAgentTools } from '../ai/tools/defaultTool';
 import { createNoteToolService, type ToolApprovalDecision } from './ai-tools/note-tools';
 import { parseAiBaseUrl, toOpenAiRequestBaseUrl } from '../utils/ai/baseUrl';
+import { toJsonSafeValue } from '../utils/serialization/ipcSafe';
 
 export interface AiRuntimeSettings {
   apiKey: string | null;
@@ -55,6 +56,20 @@ export interface AiToolApprovalRespondRequest {
 export interface AiModelsListRequest {
   baseURL?: string | null;
   apiKey: string | null;
+}
+
+interface SerializedAiErrorDetail {
+  name?: string;
+  message: string;
+  stack?: string;
+  statusCode?: number;
+  code?: string | number;
+  url?: string;
+  responseBody?: string;
+  data?: unknown;
+  requestBodyValues?: unknown;
+  responseHeaders?: unknown;
+  isRetryable?: boolean;
 }
 
 type SupportedAiProvider = 'openai' | 'anthropic' | 'google' | 'openai-compatible' | 'gateway';
@@ -286,6 +301,58 @@ function sendToRenderer(event: IpcMainInvokeEvent, channel: string, payload: any
 function serializeError(e: unknown): string {
   if (e instanceof Error) return e.message;
   return String(e || 'Unknown error');
+}
+
+function serializeErrorDetail(e: unknown): SerializedAiErrorDetail {
+  const message = serializeError(e);
+  if (!e || typeof e !== 'object') {
+    return { message };
+  }
+
+  const error = e as any;
+  const detail: SerializedAiErrorDetail = { message };
+
+  if (typeof error.name === 'string' && error.name.trim().length > 0) {
+    detail.name = error.name;
+  }
+  if (typeof error.stack === 'string' && error.stack.trim().length > 0) {
+    detail.stack = error.stack;
+  }
+  if (typeof error.statusCode === 'number' && Number.isFinite(error.statusCode)) {
+    detail.statusCode = error.statusCode;
+  }
+  if (
+    (typeof error.code === 'string' && error.code.trim().length > 0) ||
+    (typeof error.code === 'number' && Number.isFinite(error.code))
+  ) {
+    detail.code = error.code;
+  }
+  if (typeof error.url === 'string' && error.url.trim().length > 0) {
+    detail.url = error.url;
+  }
+  if (typeof error.responseBody === 'string' && error.responseBody.trim().length > 0) {
+    detail.responseBody = error.responseBody;
+  }
+  if (typeof error.isRetryable === 'boolean') {
+    detail.isRetryable = error.isRetryable;
+  }
+
+  const data = toJsonSafeValue(error.data);
+  if (data !== null && data !== undefined) {
+    detail.data = data;
+  }
+
+  const requestBodyValues = toJsonSafeValue(error.requestBodyValues);
+  if (requestBodyValues !== null && requestBodyValues !== undefined) {
+    detail.requestBodyValues = requestBodyValues;
+  }
+
+  const responseHeaders = toJsonSafeValue(error.responseHeaders);
+  if (responseHeaders !== null && responseHeaders !== undefined) {
+    detail.responseHeaders = responseHeaders;
+  }
+
+  return detail;
 }
 
 function untrackApproval(streamId: string, approvalId: string) {
@@ -560,12 +627,13 @@ export function setupAiIpc() {
           abortSignal: controller.signal,
           providerOptions,
           // 开启 raw chunk 以便在部分提供商仅返回 reasoning_details 时做兜底解析
-          includeRawChunks: shouldRequestReasoning && openAiCompatibleProviderName === 'openrouter',
+          includeRawChunks: shouldRequestReasoning,
         });
 
         // 若 SDK 已经产出 reasoning-* chunk，则不再用 raw 兜底，避免重复
         let sdkReasoningSeen = false;
         let rawReasoningActive = false;
+        let streamHasError = false;
         const rawReasoningId = 'reasoning-0';
 
         const extractReasoningDeltaFromRaw = (rawValue: unknown): string => {
@@ -611,6 +679,25 @@ export function setupAiIpc() {
 
         for await (const part of result.fullStream) {
           if (controller.signal.aborted) break;
+          const partType = (part as any)?.type;
+
+          // 部分 provider 会在 fullStream 中产出 error chunk，而不是直接 throw。
+          if (
+            typeof partType === 'string' &&
+            partType !== 'tool-error' &&
+            partType.includes('error')
+          ) {
+            streamHasError = true;
+            const detail = serializeErrorDetail(
+              (part as any).error ?? (part as any).cause ?? (part as any).value ?? part,
+            );
+            sendToRenderer(event, 'ai:chat-stream-error', {
+              streamId,
+              message: detail.message,
+              detail,
+            });
+            break;
+          }
 
           if (part.type === 'text-delta') {
             sendToRenderer(event, 'ai:chat-stream-delta', {
@@ -704,6 +791,10 @@ export function setupAiIpc() {
           }
         }
 
+        if (streamHasError) {
+          return;
+        }
+
         // 兜底结束（仅 raw reasoning 走这里）
         if (rawReasoningActive && !sdkReasoningSeen) {
           sendToRenderer(event, 'ai:chat-stream-reasoning-end', {
@@ -718,7 +809,12 @@ export function setupAiIpc() {
           sendToRenderer(event, 'ai:chat-stream-end', { streamId });
           return;
         }
-        sendToRenderer(event, 'ai:chat-stream-error', { streamId, message: serializeError(e) });
+        const detail = serializeErrorDetail(e);
+        sendToRenderer(event, 'ai:chat-stream-error', {
+          streamId,
+          message: detail.message,
+          detail,
+        });
       } finally {
         cancelApprovalsForStream(streamId, '流已结束，审批自动取消');
         activeStreams.delete(streamId);

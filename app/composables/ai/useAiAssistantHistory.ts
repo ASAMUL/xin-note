@@ -1,6 +1,8 @@
 import type { UIMessage } from 'ai';
 
 import type {
+  AiAssistantErrorCategory,
+  AiAssistantErrorInfo,
   AiAssistantMessage,
   AiAssistantMessageMeta,
   AiAssistantRagSource,
@@ -121,6 +123,53 @@ function sanitizeSources(raw: unknown): AiAssistantRagSource[] | undefined {
     .filter((item): item is AiAssistantRagSource => !!item);
 
   return sources.length > 0 ? sources : undefined;
+}
+
+function sanitizeAiError(raw: unknown): AiAssistantErrorInfo | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const item = raw as Partial<AiAssistantErrorInfo>;
+
+  const categoryList: AiAssistantErrorCategory[] = [
+    'abort',
+    'config',
+    'network',
+    'auth',
+    'permission',
+    'region',
+    'model',
+    'rate-limit',
+    'service',
+    'unknown',
+  ];
+
+  const category = categoryList.includes(item.category as AiAssistantErrorCategory)
+    ? (item.category as AiAssistantErrorCategory)
+    : 'unknown';
+
+  const summary = typeof item.summary === 'string' ? item.summary.trim() : '';
+  if (!summary) return undefined;
+
+  const title =
+    typeof item.title === 'string' && item.title.trim().length > 0 ? item.title.trim() : '请求失败';
+
+  const detail =
+    typeof item.detail === 'string' && item.detail.trim().length > 0 ? item.detail : summary;
+
+  const statusCode =
+    typeof item.statusCode === 'number' && Number.isFinite(item.statusCode)
+      ? item.statusCode
+      : undefined;
+
+  return {
+    id: typeof item.id === 'string' && item.id.trim().length > 0 ? item.id : createId('ai-err'),
+    category,
+    title,
+    summary,
+    detail,
+    createdAt: normalizeDateString(item.createdAt),
+    retryable: typeof item.retryable === 'boolean' ? item.retryable : true,
+    ...(typeof statusCode === 'number' ? { statusCode } : {}),
+  };
 }
 
 function sanitizeMessageParts(raw: unknown): PersistedMessagePart[] {
@@ -247,6 +296,7 @@ function normalizeMessage(raw: unknown): AiAssistantMessage | null {
       typeof meta?.ragWarning === 'string' && meta.ragWarning.trim().length > 0
         ? meta.ragWarning.trim()
         : undefined,
+    error: sanitizeAiError(meta?.error),
   };
 
   return {
@@ -342,6 +392,7 @@ function toPersistedMessage(message: AiAssistantMessage): PersistedMessage {
         typeof metadata.ragWarning === 'string' && metadata.ragWarning.trim().length > 0
           ? metadata.ragWarning.trim()
           : undefined,
+      error: sanitizeAiError(metadata.error),
     },
   };
 }
