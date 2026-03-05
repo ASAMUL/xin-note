@@ -1,4 +1,4 @@
-import type { AttachmentFile, PromptInputContext } from './types'
+import type { AttachmentFile, PromptInputContext, PromptInputMessage, PromptInputReference } from './types'
 import { nanoid } from 'nanoid'
 import { inject, onBeforeUnmount, provide, ref } from 'vue'
 import { PROMPT_INPUT_KEY } from './types'
@@ -8,11 +8,12 @@ export function usePromptInputProvider(props: {
   maxFiles?: number
   maxFileSize?: number
   accept?: string
-  onSubmit?: (message: { text: string, files: any[] }) => void | Promise<void>
+  onSubmit?: (message: PromptInputMessage) => void | Promise<void>
   onError?: (err: { code: string, message: string }) => void
 }) {
   const textInput = ref(props.initialInput || '')
   const files = ref<AttachmentFile[]>([])
+  const references = ref<PromptInputReference[]>([])
   const fileInputRef = ref<HTMLInputElement | null>(null)
   const isLoading = ref(false)
 
@@ -28,6 +29,13 @@ export function usePromptInputProvider(props: {
   const setTextInput = (val: string) => {
     textInput.value = val
   }
+
+  const fileNameFromPath = (filePath: string) => {
+    const normalized = (filePath || '').replace(/\\/g, '/')
+    return normalized.split('/').pop() || normalized
+  }
+
+  const normalizeDocId = (docId: string) => (docId || '').replace(/\\/g, '/').toLowerCase()
 
   const matchesAccept = (file: File) => {
     if (!props.accept || props.accept.trim() === '')
@@ -85,6 +93,32 @@ export function usePromptInputProvider(props: {
     files.value = files.value.filter(f => f.id !== id)
   }
 
+  const addReference = (input: Omit<PromptInputReference, 'id'> & { id?: string }) => {
+    const docId = (input.docId || '').trim()
+    if (!docId) {
+      return null
+    }
+    const normalizedDocId = normalizeDocId(docId)
+
+    const existed = references.value.find(reference => normalizeDocId(reference.docId) === normalizedDocId)
+    if (existed) {
+      return existed
+    }
+
+    const nextReference: PromptInputReference = {
+      id: input.id || nanoid(),
+      docId,
+      fileName: (input.fileName || '').trim() || fileNameFromPath(docId),
+    }
+
+    references.value = [...references.value, nextReference]
+    return nextReference
+  }
+
+  const removeReference = (id: string) => {
+    references.value = references.value.filter(reference => reference.id !== id)
+  }
+
   const clearFiles = () => {
     files.value.forEach((f) => {
       if (f.url && f.url.startsWith('blob:')) {
@@ -92,6 +126,10 @@ export function usePromptInputProvider(props: {
       }
     })
     files.value = []
+  }
+
+  const clearReferences = () => {
+    references.value = []
   }
 
   const clearInput = () => {
@@ -136,6 +174,7 @@ export function usePromptInputProvider(props: {
     const message = {
       text: textInput.value,
       files: processedFiles,
+      references: [...references.value],
     }
 
     try {
@@ -146,6 +185,7 @@ export function usePromptInputProvider(props: {
       }
       clearInput()
       clearFiles()
+      clearReferences()
     }
     catch (e) {
       if (props.onError) {
@@ -167,12 +207,16 @@ export function usePromptInputProvider(props: {
   const context: PromptInputContext = {
     textInput,
     files,
+    references,
     fileInputRef,
     isLoading,
     setTextInput,
     addFiles,
     removeFile,
+    addReference,
+    removeReference,
     clearFiles,
+    clearReferences,
     clearInput,
     openFileDialog,
     submitForm,

@@ -181,6 +181,16 @@
     }
   },
   "aiAssistant": {
+    "references": {
+      "placeholder": "Ask anything… (type {'@'} to reference notes, Enter to send, Shift+Enter for newline)",
+      "panelTitle": "Select notes to reference",
+      "currentPage": "Current page",
+      "linkToPage": "Link to page",
+      "searchResults": "Search results",
+      "moreResults": "{count} more results",
+      "searching": "Searching notes…",
+      "noResults": "No note results to reference"
+    },
     "error": {
       "actions": {
         "viewDetail": "View Details"

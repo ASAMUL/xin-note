@@ -1,4 +1,5 @@
 import type { ChatStatus, FileUIPart, UIMessage } from 'ai';
+import type { PromptInputReference } from '~/components/ai-elements/prompt-input';
 
 import { nanoid } from 'nanoid';
 
@@ -821,8 +822,30 @@ export function useAiAssistantChat() {
     });
   };
 
-  const createUserMessage = (text: string, files: FileUIPart[] = []): AiAssistantMessage => {
+  const normalizeReferences = (references: PromptInputReference[] = []) => {
+    const dedupe = new Set<string>();
+    const normalized: PromptInputReference[] = [];
+    for (const reference of Array.isArray(references) ? references : []) {
+      const docId = (reference?.docId || '').trim();
+      const normalizedDocId = docId.replace(/\\/g, '/').toLowerCase();
+      if (!docId || dedupe.has(normalizedDocId)) continue;
+      dedupe.add(normalizedDocId);
+      normalized.push({
+        id: reference?.id || nanoid(),
+        docId,
+        fileName: (reference?.fileName || '').trim() || docId.replace(/\\/g, '/').split('/').pop() || docId,
+      });
+    }
+    return normalized;
+  };
+
+  const createUserMessage = (
+    text: string,
+    files: FileUIPart[] = [],
+    references: PromptInputReference[] = [],
+  ): AiAssistantMessage => {
     const createdAt = nowIso();
+    const normalizedReferences = normalizeReferences(references);
 
     return {
       id: nanoid(),
@@ -838,6 +861,7 @@ export function useAiAssistantChat() {
       ],
       metadata: {
         createdAt,
+        referencedDocs: normalizedReferences.length > 0 ? normalizedReferences : undefined,
       },
     } as AiAssistantMessage;
   };
@@ -871,11 +895,17 @@ export function useAiAssistantChat() {
     );
   };
 
-  const sendMessage = async (payload: { text: string; files?: FileUIPart[] }) => {
+  const sendMessage = async (payload: {
+    text: string;
+    files?: FileUIPart[];
+    references?: PromptInputReference[];
+  }) => {
     await initializeHistory();
 
     const text = (payload.text || '').trim();
     const files = payload.files || [];
+    const references = normalizeReferences(payload.references || []);
+    const referenceDocIds = references.map(reference => reference.docId);
 
     if (!text && files.length === 0) return;
     if (isBusy.value) return;
@@ -886,7 +916,7 @@ export function useAiAssistantChat() {
     const sessionId = session.id;
     const hasUserMessage = session.messages.some((message) => message.role === 'user');
 
-    const userMessage = createUserMessage(text, files);
+    const userMessage = createUserMessage(text, files, references);
     const assistantMessage = createAssistantMessage();
     const assistantId = assistantMessage.id;
 
@@ -921,7 +951,9 @@ export function useAiAssistantChat() {
     status.value = 'submitted';
 
     try {
-      const ragResult = await searchNotes(text);
+      const ragResult = await searchNotes(text, undefined, {
+        docIds: referenceDocIds,
+      });
       setAssistantMeta(sessionId, assistantId, {
         ragSources: ragResult.sources.length > 0 ? ragResult.sources : undefined,
         ragWarning: ragResult.warning,

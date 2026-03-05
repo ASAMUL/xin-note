@@ -7,6 +7,12 @@ export interface AiAssistantRagSource {
   chunkId: string;
 }
 
+export interface AiAssistantReferencedDoc {
+  id: string;
+  docId: string;
+  fileName: string;
+}
+
 export type AiAssistantErrorCategory =
   | 'abort'
   | 'config'
@@ -32,6 +38,7 @@ export interface AiAssistantErrorInfo {
 
 export interface AiAssistantMessageMeta {
   createdAt: string;
+  referencedDocs?: AiAssistantReferencedDoc[];
   ragSources?: AiAssistantRagSource[];
   ragWarning?: string;
   error?: AiAssistantErrorInfo;

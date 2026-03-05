@@ -216,12 +216,12 @@ const getDisplayName = (name: string) => {
 .tab-icon {
   width: 14px;
   height: 14px;
-  color: var(--text-mute);
+  color: var(--color-icon);
   flex-shrink: 0;
 }
 
 .tab-item--active .tab-icon {
-  color: var(--accent-color);
+  color: var(--color-icon);
 }
 
 .tab-name {

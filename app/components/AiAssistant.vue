@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { DynamicToolUIPart } from 'ai';
-import type { PromptInputMessage } from '~/components/ai-elements/prompt-input';
+import type {
+  PromptInputContext,
+  PromptInputMessage,
+  PromptInputReference,
+} from '~/components/ai-elements/prompt-input';
+import type { NoteItem } from '~/composables/useNotes';
 import type {
   AiAssistantErrorInfo,
   AiAssistantMessage,
@@ -47,7 +52,13 @@ import {
 } from '~/components/ai-elements/chain-of-thought';
 import { Sources, SourcesContent, SourcesTrigger } from '~/components/ai-elements/sources';
 import { Suggestion, Suggestions } from '~/components/ai-elements/suggestion';
-import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '~/components/ai-elements/tool';
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from '~/components/ai-elements/tool';
 import {
   Confirmation,
   ConfirmationAccepted,
@@ -62,6 +73,10 @@ import AiAssistantChatModelPicker from '~/components/ai-assistant/AiAssistantCha
 import AiAssistantErrorNotice from '~/components/ai-assistant/AiAssistantErrorNotice.vue';
 import { useAiAssistantChat } from '~/composables/ai/useAiAssistantChat';
 import { useAiAssistantErrorLog } from '~/composables/ai/useAiAssistantErrorLog';
+import { useNoteContentSearch } from '~/composables/search/useNoteContentSearch';
+import { useNotes } from '~/composables/useNotes';
+import { useSettings } from '~/composables/useSettings';
+import { useTabs } from '~/composables/useTabs';
 
 const {
   resolved,
@@ -82,7 +97,10 @@ const {
   deleteSession,
 } = useAiAssistantChat();
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
+const { notesDirectory } = useSettings();
+const { notes, loadNotes } = useNotes();
+const { openTabs } = useTabs();
 const { errorLogs } = useAiAssistantErrorLog();
 
 const historyOpen = ref(false);
@@ -95,6 +113,450 @@ const quickSuggestions = [
   '基于我正在写的内容，给我 3 个续写灵感。',
   '把下面内容提炼成要点清单。',
 ];
+
+interface PromptCursorChangePayload {
+  value: string;
+  selectionStart: number;
+  selectionEnd: number;
+}
+
+interface MentionRange {
+  start: number;
+  end: number;
+  query: string;
+}
+
+interface AiAssistantMentionCandidate {
+  docId: string;
+  fileName: string;
+  relativePath: string;
+  snippet?: string;
+}
+
+interface MentionCandidateGroup {
+  key: string;
+  label: string;
+  candidates: AiAssistantMentionCandidate[];
+}
+
+interface MentionDropdownData {
+  visibleGroups: MentionCandidateGroup[];
+  flatCandidates: AiAssistantMentionCandidate[];
+  totalCount: number;
+  moreCount: number;
+}
+
+const MENTION_MAX_VISIBLE = 8;
+
+const mentionSearchTerm = ref('');
+const mentionOpen = ref(false);
+const mentionQuery = ref('');
+const mentionRange = ref<MentionRange | null>(null);
+const mentionActiveIndex = ref(0);
+
+const { results: mentionSearchResults, loading: mentionSearchLoading } = useNoteContentSearch({
+  searchTerm: mentionSearchTerm,
+  notesDirectory,
+  limit: 24,
+  debounceMs: 180,
+});
+
+watch(
+  () => notesDirectory.value,
+  (dir) => {
+    if (!dir) return;
+    void loadNotes();
+  },
+  { immediate: true },
+);
+
+const normalizePath = (filePath: string) => (filePath || '').replace(/\\/g, '/');
+
+const fileNameFromPath = (filePath: string) => {
+  const normalized = normalizePath(filePath);
+  return normalized.split('/').pop() || normalized;
+};
+
+const normalizeDocId = (docId: string) => normalizePath(docId).toLowerCase();
+
+const getRelativePath = (filePath: string) => {
+  const root = normalizePath(notesDirectory.value || '');
+  const normalized = normalizePath(filePath);
+  if (!root || !normalized.startsWith(root)) {
+    return normalized;
+  }
+  const relative = normalized.slice(root.length).replace(/^\/+/, '');
+  return relative || fileNameFromPath(normalized);
+};
+
+const flattenNotes = (noteList: NoteItem[]): NoteItem[] => {
+  const result: NoteItem[] = [];
+  for (const note of noteList) {
+    if (!note.isFolder) {
+      result.push(note);
+    }
+    if (note.children?.length) {
+      result.push(...flattenNotes(note.children));
+    }
+  }
+  return result;
+};
+
+const allNoteMentionCandidates = computed<AiAssistantMentionCandidate[]>(() => {
+  const dedupe = new Set<string>();
+  const flatNotes = flattenNotes(notes.value);
+  const candidates: AiAssistantMentionCandidate[] = [];
+
+  for (const note of flatNotes) {
+    const docId = (note.path || '').trim();
+    if (!docId) continue;
+    const normalizedDocId = normalizeDocId(docId);
+    if (dedupe.has(normalizedDocId)) continue;
+    dedupe.add(normalizedDocId);
+
+    candidates.push({
+      docId,
+      fileName: note.name || fileNameFromPath(docId),
+      relativePath: getRelativePath(docId),
+    });
+  }
+
+  return candidates;
+});
+
+const openedTabMentionCandidates = computed<AiAssistantMentionCandidate[]>(() => {
+  const dedupe = new Set<string>();
+  const candidates: AiAssistantMentionCandidate[] = [];
+
+  for (const tab of openTabs.value) {
+    const docId = (tab.path || '').trim();
+    if (!docId) continue;
+    const normalizedDocId = normalizeDocId(docId);
+    if (dedupe.has(normalizedDocId)) continue;
+    dedupe.add(normalizedDocId);
+
+    candidates.push({
+      docId,
+      fileName: tab.name || fileNameFromPath(docId),
+      relativePath: getRelativePath(docId),
+    });
+  }
+
+  return candidates;
+});
+
+const resetMentionState = () => {
+  mentionOpen.value = false;
+  mentionQuery.value = '';
+  mentionSearchTerm.value = '';
+  mentionRange.value = null;
+  mentionActiveIndex.value = 0;
+};
+
+const getPromptReferences = (context: PromptInputContext): PromptInputReference[] => {
+  const rawReferences = (context as any)?.references;
+  if (Array.isArray(rawReferences)) {
+    return rawReferences as PromptInputReference[];
+  }
+  if (rawReferences && Array.isArray(rawReferences.value)) {
+    return rawReferences.value as PromptInputReference[];
+  }
+  return [];
+};
+
+const getPromptTextInputValue = (context: PromptInputContext) => {
+  const rawTextInput = (context as any)?.textInput;
+  if (typeof rawTextInput === 'string') {
+    return rawTextInput;
+  }
+  if (rawTextInput && typeof rawTextInput.value === 'string') {
+    return rawTextInput.value;
+  }
+  return '';
+};
+
+const matchMentionCandidate = (candidate: AiAssistantMentionCandidate, query: string) => {
+  if (!query) return true;
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return (
+    candidate.fileName.toLowerCase().includes(normalizedQuery) ||
+    candidate.relativePath.toLowerCase().includes(normalizedQuery) ||
+    normalizePath(candidate.docId).toLowerCase().includes(normalizedQuery)
+  );
+};
+
+const parseMentionRange = (text: string, caretIndex: number): MentionRange | null => {
+  const value = text || '';
+  const safeCaret = Math.max(0, Math.min(caretIndex, value.length));
+  const prefix = value.slice(0, safeCaret);
+  const atIndex = prefix.lastIndexOf('@');
+  if (atIndex < 0) return null;
+
+  const charBeforeAt = atIndex === 0 ? '' : prefix[atIndex - 1];
+  if (charBeforeAt && !/[\s([{,，。；;、]/.test(charBeforeAt)) {
+    return null;
+  }
+
+  const query = prefix.slice(atIndex + 1);
+  if (/\s/.test(query) || query.includes('@')) {
+    return null;
+  }
+
+  return {
+    start: atIndex,
+    end: safeCaret,
+    query,
+  };
+};
+
+/**
+ * 构建分组的候选列表（无数量限制），返回「当前页面 / 链接到页面 / 搜索结果」分组
+ */
+const buildMentionGroups = (context: PromptInputContext): MentionCandidateGroup[] => {
+  const normalizedQuery = mentionQuery.value.trim().toLowerCase();
+  const selectedDocIds = new Set(getPromptReferences(context).map((r) => normalizeDocId(r.docId)));
+  const globalDedupe = new Set<string>();
+  const groups: MentionCandidateGroup[] = [];
+
+  const filterAndDedupe = (
+    candidates: AiAssistantMentionCandidate[],
+  ): AiAssistantMentionCandidate[] => {
+    return candidates.filter((c) => {
+      const id = normalizeDocId(c.docId);
+      if (selectedDocIds.has(id) || globalDedupe.has(id)) return false;
+      globalDedupe.add(id);
+      return true;
+    });
+  };
+
+  if (normalizedQuery.length === 0) {
+    const opened = filterAndDedupe(openedTabMentionCandidates.value);
+    if (opened.length > 0) {
+      groups.push({
+        key: 'current',
+        label: t('aiAssistant.references.currentPage'),
+        candidates: opened,
+      });
+    }
+    const allNotes = filterAndDedupe(allNoteMentionCandidates.value);
+    if (allNotes.length > 0) {
+      groups.push({
+        key: 'all',
+        label: t('aiAssistant.references.linkToPage'),
+        candidates: allNotes,
+      });
+    }
+  } else {
+    const matchedOpened = filterAndDedupe(
+      openedTabMentionCandidates.value.filter((c) => matchMentionCandidate(c, normalizedQuery)),
+    );
+    const matchedAll = filterAndDedupe(
+      allNoteMentionCandidates.value.filter((c) => matchMentionCandidate(c, normalizedQuery)),
+    );
+    const matchedSearch = filterAndDedupe(
+      mentionSearchResults.value
+        .filter((hit) => (hit.path || '').trim())
+        .map((hit) => ({
+          docId: hit.path.trim(),
+          fileName: hit.name || fileNameFromPath(hit.path.trim()),
+          relativePath: getRelativePath(hit.path.trim()),
+          snippet: (hit.snippet || '').trim(),
+        })),
+    );
+
+    const combined = [...matchedOpened, ...matchedAll, ...matchedSearch];
+    if (combined.length > 0) {
+      groups.push({
+        key: 'search',
+        label: t('aiAssistant.references.searchResults'),
+        candidates: combined,
+      });
+    }
+  }
+
+  return groups;
+};
+
+/**
+ * 将分组裁剪到 MENTION_MAX_VISIBLE 条以内，并返回扁平列表、总数、剩余数
+ */
+const computeMentionDropdownData = (context: PromptInputContext): MentionDropdownData => {
+  const allGroups = buildMentionGroups(context);
+  const totalCount = allGroups.reduce((sum, g) => sum + g.candidates.length, 0);
+
+  let remaining = MENTION_MAX_VISIBLE;
+  const visibleGroups: MentionCandidateGroup[] = [];
+  for (const group of allGroups) {
+    if (remaining <= 0) break;
+    const limited = group.candidates.slice(0, remaining);
+    if (limited.length > 0) {
+      visibleGroups.push({ ...group, candidates: limited });
+      remaining -= limited.length;
+    }
+  }
+
+  const flatCandidates = visibleGroups.flatMap((g) => g.candidates);
+  const moreCount = Math.max(0, totalCount - flatCandidates.length);
+
+  return { visibleGroups, flatCandidates, totalCount, moreCount };
+};
+
+/**
+ * 计算某个候选项在扁平列表中的全局索引（跨分组）
+ */
+const getGlobalMentionIndex = (
+  groups: MentionCandidateGroup[],
+  groupKey: string,
+  localIndex: number,
+): number => {
+  let offset = 0;
+  for (const group of groups) {
+    if (group.key === groupKey) return offset + localIndex;
+    offset += group.candidates.length;
+  }
+  return -1;
+};
+
+const getMentionFileIcon = (candidate: AiAssistantMentionCandidate): string => {
+  const ext = (candidate.fileName.split('.').pop() || '').toLowerCase();
+  if (['md', 'mdx', 'txt'].includes(ext)) return 'i-lucide-file-text';
+  if (['json', 'yaml', 'yml', 'toml', 'xml'].includes(ext)) return 'i-lucide-file-code';
+  if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) return 'i-lucide-file-image';
+  return 'i-lucide-file-text';
+};
+
+const handlePromptCursorChange = (payload: PromptCursorChangePayload) => {
+  if (payload.selectionStart !== payload.selectionEnd) {
+    resetMentionState();
+    return;
+  }
+
+  const nextMention = parseMentionRange(payload.value, payload.selectionStart);
+  if (!nextMention) {
+    resetMentionState();
+    return;
+  }
+
+  const wasOpen = mentionOpen.value;
+  const queryChanged = nextMention.query !== mentionQuery.value;
+
+  mentionOpen.value = true;
+  mentionRange.value = nextMention;
+  mentionQuery.value = nextMention.query;
+  mentionSearchTerm.value = nextMention.query;
+
+  // 仅在菜单首次打开或搜索词变化时重置索引，避免覆盖上下键导航
+  if (!wasOpen || queryChanged) {
+    mentionActiveIndex.value = 0;
+  }
+
+  if (notesDirectory.value && notes.value.length === 0) {
+    void loadNotes();
+  }
+};
+
+const syncMentionFromTextarea = (context: PromptInputContext, target?: EventTarget | null) => {
+  if (target instanceof HTMLTextAreaElement) {
+    handlePromptCursorChange({
+      value: target.value,
+      selectionStart: target.selectionStart ?? target.value.length,
+      selectionEnd: target.selectionEnd ?? target.value.length,
+    });
+    return;
+  }
+
+  const value = getPromptTextInputValue(context);
+  handlePromptCursorChange({
+    value,
+    selectionStart: value.length,
+    selectionEnd: value.length,
+  });
+};
+
+const selectMentionCandidate = (
+  candidate: AiAssistantMentionCandidate,
+  context: PromptInputContext,
+) => {
+  const added = context.addReference({
+    docId: candidate.docId,
+    fileName: candidate.fileName,
+  });
+  if (!added) {
+    resetMentionState();
+    return;
+  }
+
+  const currentText = getPromptTextInputValue(context);
+  const currentMentionRange = mentionRange.value;
+  if (currentMentionRange) {
+    const before = currentText.slice(0, currentMentionRange.start);
+    const after = currentText.slice(currentMentionRange.end);
+    const needsSpace =
+      before.length > 0 && after.length > 0 && !/\s$/.test(before) && !/^\s/.test(after);
+    context.setTextInput(`${before}${needsSpace ? ' ' : ''}${after}`);
+  }
+
+  resetMentionState();
+};
+
+const handlePromptKeyDown = (event: KeyboardEvent, context: PromptInputContext) => {
+  const shouldSyncMention =
+    event.key.length === 1 ||
+    event.key === 'Backspace' ||
+    event.key === 'Delete' ||
+    event.key === 'ArrowLeft' ||
+    event.key === 'ArrowRight' ||
+    event.key === 'Home' ||
+    event.key === 'End';
+
+  if (shouldSyncMention) {
+    setTimeout(() => {
+      syncMentionFromTextarea(context, event.target);
+    }, 0);
+  }
+
+  if (!mentionOpen.value) return;
+
+  const { flatCandidates: candidates } = computeMentionDropdownData(context);
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    resetMentionState();
+    return;
+  }
+
+  if (candidates.length === 0) {
+    if (event.key === 'Tab' || event.key === 'Enter') {
+      event.preventDefault();
+    }
+    return;
+  }
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    mentionActiveIndex.value = (mentionActiveIndex.value + 1) % candidates.length;
+    return;
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    mentionActiveIndex.value =
+      mentionActiveIndex.value === 0 ? candidates.length - 1 : mentionActiveIndex.value - 1;
+    return;
+  }
+
+  if (event.key === 'Tab' || event.key === 'Enter') {
+    event.preventDefault();
+    const candidate = candidates[mentionActiveIndex.value] || candidates[0];
+    if (candidate) {
+      selectMentionCandidate(candidate, context);
+    }
+  }
+};
+
+const removePromptReference = (referenceId: string, context: PromptInputContext) => {
+  context.removeReference(referenceId);
+};
 
 const getMessageText = (message: AiAssistantMessage) => {
   const parts = Array.isArray(message.parts) ? message.parts : [];
@@ -120,6 +582,11 @@ const getMessageSources = (message: AiAssistantMessage): AiAssistantRagSource[] 
 const getRagWarning = (message: AiAssistantMessage) => {
   const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
   return typeof metadata.ragWarning === 'string' ? metadata.ragWarning : '';
+};
+
+const getMessageReferences = (message: AiAssistantMessage): PromptInputReference[] => {
+  const metadata = (message.metadata || {}) as AiAssistantMessageMeta;
+  return Array.isArray(metadata.referencedDocs) ? metadata.referencedDocs : [];
 };
 
 const getMessageError = (message: AiAssistantMessage): AiAssistantErrorInfo | null => {
@@ -165,15 +632,15 @@ const validToolStates = new Set([
 
 const isAssistantToolPart = (part: any): part is AssistantToolPart => {
   return (
-    part
-    && typeof part === 'object'
-    && part.type === 'dynamic-tool'
-    && typeof part.toolCallId === 'string'
-    && part.toolCallId.trim().length > 0
-    && typeof part.toolName === 'string'
-    && part.toolName.trim().length > 0
-    && typeof part.state === 'string'
-    && validToolStates.has(part.state)
+    part &&
+    typeof part === 'object' &&
+    part.type === 'dynamic-tool' &&
+    typeof part.toolCallId === 'string' &&
+    part.toolCallId.trim().length > 0 &&
+    typeof part.toolName === 'string' &&
+    part.toolName.trim().length > 0 &&
+    typeof part.state === 'string' &&
+    validToolStates.has(part.state)
   );
 };
 
@@ -207,7 +674,6 @@ const isMessageStreaming = (message: AiAssistantMessage) => {
       (part?.type === 'text' || part?.type === 'reasoning') && part?.state === 'streaming',
   );
 };
-
 
 type ChainOfThoughtStepStatus = 'complete' | 'active' | 'pending';
 
@@ -332,21 +798,24 @@ const getProgressSteps = (
   const reasoningStreaming = parts.some(
     (part: any) => part?.type === 'reasoning' && part?.state === 'streaming',
   );
-  const textStreaming = parts.some((part: any) => part?.type === 'text' && part?.state === 'streaming');
+  const textStreaming = parts.some(
+    (part: any) => part?.type === 'text' && part?.state === 'streaming',
+  );
 
   const retrievalStatus: ChainOfThoughtStepStatus =
     sourceCount > 0 || hasReasoning || hasText || !isStreaming ? 'complete' : 'active';
   const reasoningStatus: ChainOfThoughtStepStatus = reasoningStreaming
     ? 'active'
     : hasReasoning || (!isStreaming && hasText)
-      ? 'complete'
-      : 'pending';
+    ? 'complete'
+    : 'pending';
   const responseStatus: ChainOfThoughtStepStatus = textStreaming
     ? 'active'
     : hasText
-      ? 'complete'
-      : 'pending';
-  const completedStatus: ChainOfThoughtStepStatus = !isStreaming && hasText ? 'complete' : 'pending';
+    ? 'complete'
+    : 'pending';
+  const completedStatus: ChainOfThoughtStepStatus =
+    !isStreaming && hasText ? 'complete' : 'pending';
 
   return [
     {
@@ -387,9 +856,10 @@ const chainOfThoughtByMessageId = computed<Record<string, ChainOfThoughtViewMode
     const searchResults = getSearchResultTags(message);
 
     const assistantImages = getAssistantImageParts(message);
-    const images = assistantImages.length > 0
-      ? assistantImages
-      : getNearestUserImageParts(currentMessages, messageIndex);
+    const images =
+      assistantImages.length > 0
+        ? assistantImages
+        : getNearestUserImageParts(currentMessages, messageIndex);
 
     const progressSteps = getProgressSteps(message, reasoningSteps);
     const shouldShow =
@@ -460,6 +930,7 @@ const formatSessionTime = (session: AiAssistantSession) => {
 };
 
 const handleSubmit = async (payload: PromptInputMessage) => {
+  resetMentionState();
   await sendMessage(payload);
 };
 
@@ -541,7 +1012,10 @@ const handleDeleteSession = async (sessionId: string) => {
         <div class="text-xs font-semibold" style="color: var(--color-error)">
           {{ $t('aiAssistant.error.titles.unknown') }}
         </div>
-        <div class="text-xs mt-0.5 whitespace-pre-wrap wrap-break-word" style="color: var(--text-main)">
+        <div
+          class="text-xs mt-0.5 whitespace-pre-wrap wrap-break-word"
+          style="color: var(--text-main)"
+        >
           {{ chatError }}
         </div>
       </div>
@@ -595,7 +1069,7 @@ const handleDeleteSession = async (sessionId: string) => {
                   v-if="shouldShowChainOfThought(message)"
                   class="mb-2 rounded-md px-3 py-2"
                   :default-open="true"
-                  style="background-color: var(--bg-main); border: 1px solid var(--border-color)"
+                  style="background-color: var(--bg-popup); border: 1px solid var(--border-color)"
                 >
                   <ChainOfThoughtHeader class="text-xs" style="color: var(--text-mute)">
                     思考过程
@@ -616,8 +1090,8 @@ const handleDeleteSession = async (sessionId: string) => {
                               progressStep.status === 'complete'
                                 ? 'i-lucide-check'
                                 : progressStep.status === 'active'
-                                  ? 'i-lucide-loader-2'
-                                  : 'i-lucide-circle'
+                                ? 'i-lucide-loader-2'
+                                : 'i-lucide-circle'
                             "
                             class="w-4 h-4"
                             :class="progressStep.status === 'active' ? 'animate-spin' : ''"
@@ -627,7 +1101,9 @@ const handleDeleteSession = async (sessionId: string) => {
                     </div>
 
                     <div v-if="getChainSearchResults(message).length > 0" class="space-y-1">
-                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">检索结果</div>
+                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">
+                        检索结果
+                      </div>
                       <ChainOfThoughtSearchResults>
                         <ChainOfThoughtSearchResult
                           v-for="searchResult in getChainSearchResults(message)"
@@ -639,7 +1115,9 @@ const handleDeleteSession = async (sessionId: string) => {
                     </div>
 
                     <div v-if="getChainReasoningSteps(message).length > 0" class="space-y-2">
-                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">逐步思考</div>
+                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">
+                        逐步思考
+                      </div>
                       <ChainOfThoughtStep
                         v-for="(reasoningStep, stepIndex) in getChainReasoningSteps(message)"
                         :key="`${message.id}-reasoning-${stepIndex}`"
@@ -654,7 +1132,9 @@ const handleDeleteSession = async (sessionId: string) => {
                     </div>
 
                     <div v-if="getChainImages(message).length > 0" class="space-y-2">
-                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">图像</div>
+                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">
+                        图像
+                      </div>
                       <ChainOfThoughtImage
                         v-for="(image, imageIndex) in getChainImages(message)"
                         :key="`${message.id}-image-${imageIndex}`"
@@ -665,7 +1145,7 @@ const handleDeleteSession = async (sessionId: string) => {
                           :alt="image.caption"
                           class="max-h-56 w-auto rounded-md object-contain"
                           loading="lazy"
-                        >
+                        />
                       </ChainOfThoughtImage>
                     </div>
                   </ChainOfThoughtContent>
@@ -692,9 +1172,7 @@ const handleDeleteSession = async (sessionId: string) => {
                         :state="toolPart.state"
                         class="mx-4 mb-4"
                       >
-                        <ConfirmationTitle>
-                          该工具将修改笔记内容，是否允许执行？
-                        </ConfirmationTitle>
+                        <ConfirmationTitle>该工具将修改笔记内容，是否允许执行？</ConfirmationTitle>
 
                         <ConfirmationRequest>
                           <ConfirmationActions>
@@ -716,13 +1194,17 @@ const handleDeleteSession = async (sessionId: string) => {
 
                         <ConfirmationAccepted>
                           <div class="text-xs">
-                            审批通过{{ toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : '' }}
+                            审批通过{{
+                              toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : ''
+                            }}
                           </div>
                         </ConfirmationAccepted>
 
                         <ConfirmationRejected>
                           <div class="text-xs">
-                            审批拒绝{{ toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : '' }}
+                            审批拒绝{{
+                              toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : ''
+                            }}
                           </div>
                         </ConfirmationRejected>
                       </Confirmation>
@@ -751,14 +1233,17 @@ const handleDeleteSession = async (sessionId: string) => {
                       :key="`${source.docId}-${source.chunkId}`"
                       class="rounded-md px-2 py-1.5"
                       style="
-                        background-color: var(--bg-main);
+                        background-color: var(--bg-popup);
                         border: 1px solid var(--border-color);
                       "
                     >
                       <div class="text-xs font-medium" style="color: var(--text-main)">
                         {{ source.fileName }}
                       </div>
-                      <div class="text-[11px] mt-1 whitespace-pre-wrap" style="color: var(--text-mute)">
+                      <div
+                        class="text-[11px] mt-1 whitespace-pre-wrap"
+                        style="color: var(--text-mute)"
+                      >
                         {{ source.snippet }}
                       </div>
                     </div>
@@ -778,6 +1263,23 @@ const handleDeleteSession = async (sessionId: string) => {
                 <div class="whitespace-pre-wrap wrap-break-word">
                   {{ getMessageText(message) }}
                 </div>
+                <div
+                  v-if="getMessageReferences(message).length > 0"
+                  class="mt-2 flex flex-wrap gap-1.5"
+                >
+                  <span
+                    v-for="reference in getMessageReferences(message)"
+                    :key="reference.id"
+                    class="inline-flex items-center rounded-md px-2 py-1 text-[11px]"
+                    style="
+                      background-color: var(--bg-popup);
+                      border: 1px solid var(--border-color);
+                      color: var(--text-mute);
+                    "
+                  >
+                    @{{ reference.fileName }}
+                  </span>
+                </div>
               </template>
 
               <div
@@ -795,12 +1297,35 @@ const handleDeleteSession = async (sessionId: string) => {
 
     <div class="p-4" style="border-top: 1px solid var(--border-color)">
       <PromptInput
+        v-slot="{ context }"
         :max-files="4"
         accept="image/*"
         :global-drop="true"
         class="w-full"
         @submit="handleSubmit"
       >
+        <div
+          v-if="getPromptReferences(context).length > 0"
+          class="flex flex-wrap items-center gap-2 px-3 pt-3 pb-1"
+        >
+          <button
+            v-for="reference in getPromptReferences(context)"
+            :key="reference.id"
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs"
+            style="
+              background-color: var(--bg-popup);
+              border: 1px solid var(--border-color);
+              color: var(--text-main);
+            "
+            :title="reference.docId"
+            @click.prevent="removePromptReference(reference.id, context)"
+          >
+            <span class="truncate max-w-[200px]">@{{ reference.fileName }}</span>
+            <UIcon name="i-lucide-x" class="w-3 h-3" />
+          </button>
+        </div>
+
         <PromptInputAttachments>
           <template #default="{ file }">
             <PromptInputAttachment :file="file" />
@@ -809,10 +1334,79 @@ const handleDeleteSession = async (sessionId: string) => {
 
         <PromptInputBody>
           <PromptInputTextarea
-            placeholder="问我点什么…（Enter 发送，Shift+Enter 换行，支持拖拽/粘贴图片）"
+            :placeholder="t('aiAssistant.references.placeholder')"
             :disabled="!resolved.isConfigured || isBusy"
+            @cursor-change="handlePromptCursorChange"
+            @keydown="(event) => handlePromptKeyDown(event, context)"
+            @blur="resetMentionState"
           />
         </PromptInputBody>
+
+        <div
+          v-if="mentionOpen"
+          class="absolute inset-x-0 bottom-full z-50 mb-1 rounded-lg shadow-lg"
+          style="background-color: var(--bg-sidebar); border: 1px solid var(--border-color)"
+          @mousedown.prevent
+        >
+          <template v-for="md in [computeMentionDropdownData(context)]" :key="'mention'">
+            <div v-if="md.totalCount > 0" class="max-h-72 overflow-y-auto py-1">
+              <template v-for="group in md.visibleGroups" :key="group.key">
+                <div
+                  class="px-3.5 pt-3 pb-1.5 text-[11px] font-medium first:pt-1.5"
+                  style="color: var(--text-mute)"
+                >
+                  {{ group.label }}
+                </div>
+                <div
+                  v-for="(candidate, localIdx) in group.candidates"
+                  :key="candidate.docId"
+                  class="mx-1 flex items-center gap-2.5 rounded-md px-2.5 py-1.5 cursor-pointer transition-colors"
+                  :style="{
+                    backgroundColor:
+                      getGlobalMentionIndex(md.visibleGroups, group.key, localIdx) ===
+                      mentionActiveIndex
+                        ? 'var(--bg-popup)'
+                        : 'transparent',
+                  }"
+                  @click.prevent="selectMentionCandidate(candidate, context)"
+                  @pointerenter="
+                    mentionActiveIndex = getGlobalMentionIndex(
+                      md.visibleGroups,
+                      group.key,
+                      localIdx,
+                    )
+                  "
+                >
+                  <UIcon
+                    :name="getMentionFileIcon(candidate)"
+                    class="w-5 h-5 shrink-0 rounded"
+                    style="color: var(--text-mute)"
+                  />
+                  <span class="truncate text-sm" style="color: var(--text-main)">
+                    {{ candidate.fileName }}
+                  </span>
+                </div>
+              </template>
+
+              <div
+                v-if="md.moreCount > 0"
+                class="mx-1 flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[11px]"
+                style="color: var(--text-mute)"
+              >
+                <span class="w-5 text-center tracking-widest">···</span>
+                <span>{{ t('aiAssistant.references.moreResults', { count: md.moreCount }) }}</span>
+              </div>
+            </div>
+
+            <div v-else class="px-3.5 py-3 text-xs" style="color: var(--text-mute)">
+              {{
+                mentionSearchLoading
+                  ? t('aiAssistant.references.searching')
+                  : t('aiAssistant.references.noResults')
+              }}
+            </div>
+          </template>
+        </div>
 
         <PromptInputFooter>
           <div class="flex items-center gap-2">
@@ -882,7 +1476,9 @@ const handleDeleteSession = async (sessionId: string) => {
                         @click="handleSwitchSession(session.id)"
                       >
                         <div class="flex items-center justify-between gap-2">
-                          <span class="text-sm truncate" style="color: var(--text-main)">{{ session.title }}</span>
+                          <span class="text-sm truncate" style="color: var(--text-main)">
+                            {{ session.title }}
+                          </span>
                           <span class="text-[11px] shrink-0" style="color: var(--text-mute)">
                             {{ formatSessionTime(session) }}
                           </span>
@@ -919,7 +1515,10 @@ const handleDeleteSession = async (sessionId: string) => {
               <h3 class="text-sm font-semibold leading-5" style="color: var(--text-main)">
                 {{ activeErrorDetail?.title || $t('aiAssistant.error.detailModal.title') }}
               </h3>
-              <p class="text-xs mt-1 leading-5 whitespace-pre-wrap wrap-break-word" style="color: var(--text-mute)">
+              <p
+                class="text-xs mt-1 leading-5 whitespace-pre-wrap wrap-break-word"
+                style="color: var(--text-mute)"
+              >
                 {{ activeErrorDetail?.summary || $t('aiAssistant.error.detailModal.empty') }}
               </p>
             </div>
@@ -935,7 +1534,7 @@ const handleDeleteSession = async (sessionId: string) => {
           <div
             class="mt-3 rounded-md p-3 max-h-[58vh] overflow-auto whitespace-pre-wrap wrap-break-word text-xs leading-5 font-mono"
             style="
-              background-color: var(--bg-main);
+              background-color: var(--bg-popup);
               border: 1px solid var(--border-color);
               color: var(--text-main);
             "

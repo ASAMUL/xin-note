@@ -520,7 +520,7 @@ const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
 }
 
 .note-tree-item--active .note-tree-icon {
-  color: var(--accent-color);
+  color: var(--color-icon);
 }
 
 .note-tree-item--active .note-tree-label {
@@ -531,14 +531,14 @@ const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
 .note-tree-arrow {
   width: 16px;
   height: 16px;
-  color: var(--text-mute);
+  color: var(--color-icon);
   flex-shrink: 0;
   transition: transform 0.15s ease;
   cursor: pointer;
 }
 
 .note-tree-arrow:hover {
-  color: var(--text-main);
+  color: var(--color-icon);
 }
 
 .note-tree-arrow-placeholder {
@@ -549,12 +549,12 @@ const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
 .note-tree-icon {
   width: 16px;
   height: 16px;
-  color: var(--text-mute);
+  color: var(--color-icon);
   flex-shrink: 0;
 }
 
 .note-tree-icon--folder {
-  color: var(--accent-color);
+  color: var(--color-icon);
 }
 
 .note-tree-label {

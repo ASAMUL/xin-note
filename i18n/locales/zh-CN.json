@@ -181,6 +181,16 @@
     }
   },
   "aiAssistant": {
+    "references": {
+      "placeholder": "问我点什么…（输入 {'@'} 引用笔记，Enter 发送，Shift+Enter 换行）",
+      "panelTitle": "选择要引用的笔记",
+      "currentPage": "当前页面",
+      "linkToPage": "链接到页面",
+      "searchResults": "搜索结果",
+      "moreResults": "其余 {count} 个结果",
+      "searching": "正在搜索笔记…",
+      "noResults": "没有可引用的笔记结果"
+    },
     "error": {
       "actions": {
         "viewDetail": "查看详情"

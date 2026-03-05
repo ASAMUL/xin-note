@@ -1,4 +1,4 @@
-﻿import type { AiAssistantRagSource } from '~/types/ai-assistant';
+import type { AiAssistantRagSource } from '~/types/ai-assistant';
 
 import { useSettings } from '~/composables/useSettings';
 
@@ -13,6 +13,10 @@ export interface AiAssistantRagResult {
   contextText: string;
   sources: AiAssistantRagSource[];
   warning?: string;
+}
+
+export interface AiAssistantRagSearchFilters {
+  docIds?: string[];
 }
 
 const DEFAULT_SEARCH_LIMIT = 6;
@@ -90,6 +94,18 @@ function toSources(rows: RagFtsRow[], query: string) {
   return sources;
 }
 
+function normalizeDocIds(docIds?: string[]) {
+  const dedupe = new Set<string>();
+  const result: string[] = [];
+  for (const docId of Array.isArray(docIds) ? docIds : []) {
+    const normalized = (docId || '').trim();
+    if (!normalized || dedupe.has(normalized)) continue;
+    dedupe.add(normalized);
+    result.push(normalized);
+  }
+  return result;
+}
+
 async function ensureIndexed(notesDirectory: string) {
   const normalizedDir = (notesDirectory || '').trim();
   if (!normalizedDir) return;
@@ -121,7 +137,11 @@ async function ensureIndexed(notesDirectory: string) {
 export function useAiAssistantRag() {
   const { notesDirectory } = useSettings();
 
-  const searchNotes = async (queryText: string, limit = DEFAULT_SEARCH_LIMIT): Promise<AiAssistantRagResult> => {
+  const searchNotes = async (
+    queryText: string,
+    limit = DEFAULT_SEARCH_LIMIT,
+    filters?: AiAssistantRagSearchFilters,
+  ): Promise<AiAssistantRagResult> => {
     const query = (queryText || '').trim();
     if (!query) {
       return {
@@ -150,14 +170,40 @@ export function useAiAssistantRag() {
     try {
       await ensureIndexed(dir);
 
-      const rows = (await window.ipcRenderer.invoke('rag:search-fts', {
-        query,
-        limit: Math.max(1, Math.min(Math.floor(limit || DEFAULT_SEARCH_LIMIT), 12)),
-        timeoutMs: 8000,
-        select: ['docid', 'chunkid', 'text', 'meta'],
-      })) as RagFtsRow[];
+      const safeLimit = Math.max(1, Math.min(Math.floor(limit || DEFAULT_SEARCH_LIMIT), 12));
+      const docIds = normalizeDocIds(filters?.docIds);
 
-      const sources = toSources(Array.isArray(rows) ? rows : [], query);
+      const searchByDocId = async (docId?: string, rowLimit = safeLimit) => {
+        const rows = (await window.ipcRenderer.invoke('rag:search-fts', {
+          query,
+          limit: rowLimit,
+          timeoutMs: 8000,
+          ...(docId ? { docId } : {}),
+          select: ['docid', 'chunkid', 'text', 'meta'],
+        })) as RagFtsRow[];
+        return Array.isArray(rows) ? rows : [];
+      };
+
+      let rows: RagFtsRow[] = [];
+      if (docIds.length <= 1) {
+        rows = await searchByDocId(docIds[0], safeLimit);
+      } else {
+        const perDocLimit = Math.max(1, Math.min(6, Math.ceil((safeLimit * 2) / docIds.length)));
+        const groupedRows = await Promise.all(docIds.map(async docId => await searchByDocId(docId, perDocLimit)));
+        const dedupe = new Set<string>();
+        for (const group of groupedRows) {
+          for (const row of group) {
+            const key = `${(row?.docid || '').trim()}::${(row?.chunkid || '').trim()}`;
+            if (!key || dedupe.has(key)) continue;
+            dedupe.add(key);
+            rows.push(row);
+            if (rows.length >= safeLimit * 2) break;
+          }
+          if (rows.length >= safeLimit * 2) break;
+        }
+      }
+
+      const sources = toSources(rows, query).slice(0, safeLimit);
       return {
         contextText: buildContextText(sources),
         sources,
