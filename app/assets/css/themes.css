@@ -6,6 +6,7 @@
   --bg-sidebar: #f9f8f7;
   --bg-paper: white;
   --bg-popup: #ffffff;
+  --scrollbar-thumb: #d3d1cb;
   --border-color: #f0efed;
   --text-main: #000000;
   --text-mute: #857f78;
@@ -40,6 +41,7 @@
   --bg-sidebar: #161618;
   --bg-paper: #1a1a1c;
   --bg-popup: #1f1f22;
+  --scrollbar-thumb: #27272a;
   --border-color: #27272a;
   --text-main: #e4e4e7;
   --text-mute: #71717a;
@@ -74,6 +76,7 @@
   --bg-sidebar: #dcebf3;
   --bg-paper: #f6fbff;
   --bg-popup: #ffffff;
+  --scrollbar-thumb: #b9d2e0;
   --border-color: #b9d2e0;
   --text-main: #102a43;
   --text-mute: #486581;
@@ -108,6 +111,7 @@
   --bg-sidebar: #0d1d2a;
   --bg-paper: #102434;
   --bg-popup: #122739;
+  --scrollbar-thumb: #234059;
   --border-color: #234059;
   --text-main: #d7ecff;
   --text-mute: #8eb6d6;
@@ -142,6 +146,7 @@
   --bg-sidebar: #e3ebde;
   --bg-paper: #f8fbf6;
   --bg-popup: #ffffff;
+  --scrollbar-thumb: #c8d5c1;
   --border-color: #c8d5c1;
   --text-main: #1b3322;
   --text-mute: #5c7462;
@@ -176,6 +181,7 @@
   --bg-sidebar: #132219;
   --bg-paper: #162b1f;
   --bg-popup: #1a3024;
+  --scrollbar-thumb: #2e4a39;
   --border-color: #2e4a39;
   --text-main: #d6ebd9;
   --text-mute: #9ab8a1;

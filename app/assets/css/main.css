@@ -173,8 +173,6 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-
-
 /* ========================================
    全局样式
    ======================================== */
@@ -204,9 +202,9 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--border-color);
+  background-color: var(--scrollbar-thumb);
   border-radius: 6px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
   transition: background-color 0.2s;
 }
