@@ -122,8 +122,8 @@ const editorExtensions = [
       <!-- 未选择笔记提示 -->
       <div v-if="!activeTab" class="empty-editor">
         <UIcon name="i-lucide-file-text" class="w-16 h-16 empty-icon" />
-        <h3 class="empty-title">选择一篇笔记开始编辑</h3>
-        <p class="empty-desc">从左侧笔记列表选择，或创建一篇新笔记</p>
+        <h3 class="empty-title">{{ $t('notes.emptyTitle') }}</h3>
+        <p class="empty-desc">{{ $t('notes.emptyDescription') }}</p>
       </div>
 
       <!-- Nuxt UI 编辑器 -->
@@ -144,7 +144,7 @@ const editorExtensions = [
             content-type="markdown"
             :extensions="editorExtensions"
             :handlers="customHandlers"
-            placeholder="写点什么吧…（/ 打开命令，: 打开 emoji，Tab 生成灵感）"
+            :placeholder="$t('notes.editor.placeholder')"
             class="nuxt-editor"
             :on-selection-update="onSelectionUpdate"
           >

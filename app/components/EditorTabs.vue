@@ -175,6 +175,7 @@ const getDisplayName = (name: string) => {
 .tabs-list {
   display: flex;
   align-items: stretch;
+  width: 100%;
   height: 100%;
 }
 

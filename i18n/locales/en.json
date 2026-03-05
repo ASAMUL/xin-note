@@ -4,6 +4,13 @@
     "noteDefaultName": "Untitled Note",
     "noteDefaultCopyName": "Copy"
   },
+  "notes": {
+    "emptyTitle": "Select a note to start editing",
+    "emptyDescription": "From the left note list, or create a new note.",
+    "editor": {
+      "placeholder": "Write something... (/ to open commands, : to open emoji, Tab to generate inspiration)"
+    }
+  },
   "common": {
     "close": "Close",
     "save": "Save",
@@ -134,7 +141,7 @@
     },
     "notes": {
       "title": "Notes",
-      "description": "Configure notes preferences such as storage folder",
+      "description": "Configure notes preferences such as storage folder.",
       "directory": {
         "title": "Notes directory",
         "unset": "Not set",

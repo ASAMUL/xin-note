@@ -4,6 +4,13 @@
     "noteDefaultName": "未命名笔记",
     "noteDefaultCopyName": "副本"
   },
+  "notes": {
+    "emptyTitle": "选择一篇笔记开始编辑",
+    "emptyDescription": "从左侧笔记列表选择，或创建一篇新笔记",
+    "editor": {
+      "placeholder": "写点什么吧…（/ 打开命令，: 打开 emoji，Tab 生成灵感）"
+    }
+  },
   "common": {
     "close": "关闭",
     "save": "保存",
