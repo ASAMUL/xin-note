@@ -45,35 +45,12 @@ export function useShortcuts(options: ShortcutOptions = {}) {
     }
   };
 
-  /**
-   * 处理双击 Shift 检测
-   */
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // 双击 Shift 检测（只检测纯 Shift 键，没有其他修饰键）
-    if (e.key === 'Shift' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      const currentTime = Date.now();
-      const timeDiff = currentTime - lastShiftTime.value;
-
-      // 如果在阈值时间内再次按下 Shift
-      if (timeDiff < DOUBLE_SHIFT_THRESHOLD && timeDiff > 0) {
-        onOpenSearch?.();
-        // 重置时间戳防止连续触发
-        lastShiftTime.value = 0;
-      } else {
-        // 记录本次按键时间
-        lastShiftTime.value = currentTime;
-      }
-    }
-  };
-
   // 在组件挂载时注册事件监听
   onMounted(() => {
     // 监听来自主进程的快捷键消息
     if (window.ipcRenderer) {
       window.ipcRenderer.on('shortcut-triggered', handleShortcutMessage);
     }
-
-    window.addEventListener('keydown', handleKeyDown);
   });
 
   // 在组件卸载时移除事件监听
@@ -81,7 +58,6 @@ export function useShortcuts(options: ShortcutOptions = {}) {
     if (window.ipcRenderer) {
       window.ipcRenderer.off('shortcut-triggered', handleShortcutMessage);
     }
-    window.removeEventListener('keydown', handleKeyDown);
   });
 
   return {

@@ -150,7 +150,7 @@ const modifiedAtText = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 0.75rem;
-  background-color: var(--bg-sidebar);
+  background-color: var(--color-soft);
   border-top: 1px solid var(--border-color);
   font-size: 0.75rem;
   color: var(--text-mute);

@@ -211,6 +211,7 @@ const editorExtensions = [
 
 .editor-content {
   flex: 1;
+  padding-top: 40px;
   overflow-y: auto;
 }
 

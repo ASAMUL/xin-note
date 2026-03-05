@@ -1,11 +1,12 @@
 /* 内置主题：通过 data-theme 切换基础配色 */
 
 :root[data-theme='paper'] {
-  --bg-app: #f0eee5;
-  --bg-sidebar: #e8e5dc;
-  --bg-paper: #faf9f6;
+  --bg-app: white;
+  --color-soft: rgba(0, 0, 0, 0.04);
+  --bg-sidebar: #f9f8f7;
+  --bg-paper: white;
   --bg-popup: #ffffff;
-  --border-color: #d6d3c9;
+  --border-color: #f0efed;
   --text-main: #000000;
   --text-mute: #857f78;
   --highlight-bg: #fef3c7;
@@ -35,6 +36,7 @@
 
 .dark[data-theme='paper'] {
   --bg-app: #0f0f10;
+  --color-soft: rgba(0, 0, 0, 0.04);
   --bg-sidebar: #161618;
   --bg-paper: #1a1a1c;
   --bg-popup: #1f1f22;
@@ -68,6 +70,7 @@
 
 :root[data-theme='ocean'] {
   --bg-app: #e9f3f8;
+  --color-soft: rgba(0, 0, 0, 0.04);
   --bg-sidebar: #dcebf3;
   --bg-paper: #f6fbff;
   --bg-popup: #ffffff;
@@ -101,6 +104,7 @@
 
 .dark[data-theme='ocean'] {
   --bg-app: #07131d;
+  --color-soft: rgba(0, 0, 0, 0.04);
   --bg-sidebar: #0d1d2a;
   --bg-paper: #102434;
   --bg-popup: #122739;
@@ -134,6 +138,7 @@
 
 :root[data-theme='forest'] {
   --bg-app: #eef3ea;
+  --color-soft: rgba(0, 0, 0, 0.04);
   --bg-sidebar: #e3ebde;
   --bg-paper: #f8fbf6;
   --bg-popup: #ffffff;
@@ -167,6 +172,7 @@
 
 .dark[data-theme='forest'] {
   --bg-app: #0d1812;
+  --color-soft: rgba(0, 0, 0, 0.04);
   --bg-sidebar: #132219;
   --bg-paper: #162b1f;
   --bg-popup: #1a3024;
