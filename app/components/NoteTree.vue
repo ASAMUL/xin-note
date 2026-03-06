@@ -524,7 +524,6 @@ const handleFolderDrop = (event: DragEvent, folder: NoteItem) => {
 }
 
 .note-tree-item--active .note-tree-label {
-  color: var(--accent-color);
   font-weight: 500;
 }
 

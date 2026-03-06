@@ -1017,14 +1017,15 @@ const handleDeleteSession = async (sessionId: string) => {
             <template #default>
               <div class="w-full flex flex-col items-center gap-3">
                 <div class="text-xs" style="color: var(--text-mute)">试试这些快捷指令：</div>
-                <Suggestions class="justify-center">
+                <div class="w-full flex flex-col gap-2">
                   <Suggestion
                     v-for="suggestion in quickSuggestions"
                     :key="suggestion"
                     :suggestion="suggestion"
+                    class="w-full justify-start text-left rounded-lg!"
                     @click="sendMessage({ text: suggestion, files: [] })"
                   />
-                </Suggestions>
+                </div>
               </div>
             </template>
           </ConversationEmptyState>

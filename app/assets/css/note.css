@@ -56,11 +56,11 @@
 
 /* --- 行内代码 --- */
 .tiptap code {
-  color: var(--accent-color);
   background-color: var(--bg-code);
   padding: 0.2em 0.4em;
   border-radius: 3px;
   font-size: 0.85em;
+  tab-size: 2;
   font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', monospace;
 }
 
@@ -72,6 +72,7 @@
   margin: 0.5em 0;
   overflow-x: auto;
   font-family: 'JetBrains Mono', 'PingFang SC', 'Microsoft YaHei', monospace;
+  tab-size: 2;
 }
 
 .tiptap pre code {
@@ -108,7 +109,7 @@
 }
 
 .tiptap ::selection {
-  background-color: var(--highlight-bg);
+  background-color: var(--editor-selection);
 }
 
 .prose {
