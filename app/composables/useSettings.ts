@@ -12,6 +12,19 @@ import {
 import type { ThemeMode, ThemePreset } from '~/composables/theme/theme.types';
 import { parseAiBaseUrl } from '~/utils/ai/baseUrl';
 
+/** 允许的字体列表（与 nuxt.config.ts 中预加载的字体对应） */
+export const ALLOWED_FONT_FAMILIES = [
+  'system',          // 系统默认字体
+  'LXGW WenKai TC',  // 霞鹜文楷
+  'Inter',           // 无衬线英文字体
+  'Noto Serif SC',   // 思源宋体
+  'JetBrains Mono',  // 等宽编程字体
+] as const;
+
+export type FontFamily = (typeof ALLOWED_FONT_FAMILIES)[number];
+
+export const DEFAULT_FONT_FAMILY: FontFamily = 'LXGW WenKai TC';
+
 export interface AiModelPoolItem {
   id: string;
   enabled: boolean;
@@ -28,6 +41,8 @@ export interface AppSettings {
    * - Electron 场景不建议用路由前缀切换语言，因此使用本地 settings.json 持久化
    */
   locale: 'zh-CN' | 'en';
+  /** 全局界面字体 */
+  fontFamily: FontFamily;
   /**
    * AI 配置（前端直连，用户自行填写 key）
    * 注意：这会写入本地 settings.json（位于 Electron userData 目录）
@@ -135,6 +150,9 @@ function normalizeIncomingSettings(value: unknown): AppSettings {
     activeThemeId,
     customThemes,
     locale: merged.locale === 'en' ? 'en' : 'zh-CN',
+    fontFamily: ALLOWED_FONT_FAMILIES.includes((merged as any).fontFamily)
+      ? (merged as any).fontFamily
+      : DEFAULT_FONT_FAMILY,
     aiApiKey: typeof merged.aiApiKey === 'string' ? merged.aiApiKey.trim() || null : null,
     aiBaseUrl:
       typeof merged.aiBaseUrl === 'string' && merged.aiBaseUrl.trim()
@@ -159,6 +177,7 @@ const defaultSettings: AppSettings = {
   activeThemeId: DEFAULT_THEME_ID,
   customThemes: [],
   locale: 'zh-CN',
+  fontFamily: DEFAULT_FONT_FAMILY,
   aiApiKey: null,
   // 用户通常只需要填写「Base URL」本体；请求时会自动追加 /v1（末尾加 # 可禁用）
   aiBaseUrl: 'https://api.openai.com',
@@ -267,6 +286,11 @@ export function useSettings() {
     await patchSettings({ aiBaseUrl: normalized || defaultSettings.aiBaseUrl });
   };
 
+  // 更新全局字体
+  const setFontFamily = async (font: FontFamily) => {
+    await patchSettings({ fontFamily: font });
+  };
+
   // 重置设置
   const resetSettings = async () => {
     const newSettings = cloneDefaultSettings();
@@ -286,6 +310,7 @@ export function useSettings() {
     activeThemeId: computed(() => settings.value.activeThemeId),
     customThemes: computed(() => settings.value.customThemes),
     aiApiKey: computed(() => settings.value.aiApiKey),
+    fontFamily: computed(() => settings.value.fontFamily),
     aiBaseUrl: computed(() => settings.value.aiBaseUrl),
     aiModelsPool: computed(() => settings.value.aiModelsPool),
     aiChatModelId: computed(() => settings.value.aiChatModelId),
@@ -300,6 +325,7 @@ export function useSettings() {
     setTheme,
     setAiApiKey,
     setAiBaseUrl,
+    setFontFamily,
     resetSettings,
   };
 }

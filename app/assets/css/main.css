@@ -15,21 +15,29 @@
 
 :root {
   /* 背景色系 */
-  --bg-app: #f0eee5; /* 应用底色：灰暖色 */
-  --bg-sidebar: #e8e5dc; /* 侧边栏：稍深 */
-  --bg-paper: #faf9f6; /* 纸张：云峰白 */
-  --bg-popup: #ffffff; /* 弹窗背景 */
+  --bg-app: #f0eee5;
+  /* 应用底色：灰暖色 */
+  --bg-sidebar: #e8e5dc;
+  /* 侧边栏：稍深 */
+  --bg-paper: #faf9f6;
+  /* 纸张：云峰白 */
+  --bg-popup: #ffffff;
+  /* 弹窗背景 */
   --bg-code: rgba(66, 35, 3, 0.031);
   /* 边框与分隔 */
   --border-color: #d6d3c9;
 
   /* 文字色系 */
-  --text-main: #000000; /* 文字：墨色 */
-  --text-mute: #857f78; /* 弱化文字 */
+  --text-main: #000000;
+  /* 文字：墨色 */
+  --text-mute: #857f78;
+  /* 弱化文字 */
 
   /* 强调色 */
-  --highlight-bg: #fef3c7; /* 高亮背景 */
-  --accent-color: #b8860b; /* 金棕强调色 */
+  --highlight-bg: #fef3c7;
+  /* 高亮背景 */
+  --accent-color: #b8860b;
+  /* 金棕强调色 */
   --accent-hover: #9a7209;
 
   /* ====== 语义化颜色（按用途分类） ====== */
@@ -180,10 +188,13 @@
 body {
   background-color: var(--bg-app);
   color: var(--text-main);
-  /* 开启字体平滑，让 Inter 看起来更细致 */
+  /* 运行时字体覆盖：由 useFontManager 动态设置 --app-font-family */
+  font-family: var(--app-font-family, 'LXGW WenKai TC', system-ui, sans-serif);
+  /* 开启字体平滑，让字体看起来更细致 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 @theme {
   --font-sans: 'LXGW WenKai TC';
 }
@@ -259,6 +270,7 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }

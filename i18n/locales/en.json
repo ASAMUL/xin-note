@@ -137,6 +137,14 @@
             "deleteFailed": "Delete failed, please try again"
           }
         }
+      },
+      "font": {
+        "title": "Font",
+        "description": "Choose the global interface font. Takes effect immediately",
+        "system": "System Default",
+        "toast": {
+          "changed": "Font changed"
+        }
       }
     },
     "notes": {

@@ -2,15 +2,18 @@
 import { useAppLocale } from '~/composables/i18n/useAppLocale';
 import type { ThemeMode, ThemeVariableMap } from '~/composables/theme/theme.types';
 import { useThemeManager } from '~/composables/theme/useThemeManager';
+import { ALLOWED_FONT_FAMILIES, type FontFamily } from '~/composables/useSettings';
 /**
  * 设置 - 通用
  * - 语言切换：写入 settings.json，并同步到 i18n
+ * - 字体选择：全局界面字体
  * - 主题设置：模式 / 内置主题 / 自定义主题
  */
 
 defineProps<{ open?: boolean }>();
 
 const { locale, setLocale } = useAppLocale();
+const { fontFamily, setFontFamily } = useSettings();
 const {
   builtInThemes,
   customThemes,
@@ -24,6 +27,18 @@ const {
 } = useThemeManager();
 
 const toast = useToast();
+
+/** 字体选项的显示名称映射（不需要 i18n 的保持原名，仅 system 使用 i18n） */
+const fontDisplayName = (font: FontFamily): string => {
+  if (font === 'system') return $t('settings.general.font.system');
+  return font;
+};
+
+/** 切换字体 */
+const handleFontChange = async (font: FontFamily) => {
+  await setFontFamily(font);
+  toast.add({ title: $t('settings.general.font.toast.changed'), color: 'primary' });
+};
 
 interface ThemeColorDraft {
   bgApp: string;
@@ -300,6 +315,36 @@ const handleDeleteCustomTheme = async () => {
           @click="setLocale('en')"
         >
           {{ $t('settings.general.language.en') }}
+        </UButton>
+      </div>
+    </div>
+
+    <!-- 字体选择 -->
+    <div class="section-card space-y-3">
+      <div class="flex items-center gap-2">
+        <UIcon name="i-lucide-type" class="w-4 h-4" />
+        <span class="text-sm font-medium" style="color: var(--text-main)">
+          {{ $t('settings.general.font.title') }}
+        </span>
+      </div>
+
+      <p class="text-xs -mt-2" style="color: var(--text-mute)">
+        {{ $t('settings.general.font.description') }}
+      </p>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <UButton
+          v-for="font in ALLOWED_FONT_FAMILIES"
+          :key="font"
+          size="sm"
+          :variant="fontFamily === font ? 'soft' : 'ghost'"
+          :color="fontFamily === font ? 'primary' : 'neutral'"
+          icon="i-lucide-check"
+          :ui="{ leadingIcon: fontFamily === font ? '' : 'opacity-0' }"
+          :style="font !== 'system' ? { fontFamily: `'${font}'` } : {}"
+          @click="handleFontChange(font)"
+        >
+          {{ fontDisplayName(font) }}
         </UButton>
       </div>
     </div>

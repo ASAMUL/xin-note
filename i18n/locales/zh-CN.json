@@ -137,6 +137,14 @@
             "deleteFailed": "删除失败，请稍后重试"
           }
         }
+      },
+      "font": {
+        "title": "字体",
+        "description": "选择全局界面字体，切换后立即生效",
+        "system": "系统默认",
+        "toast": {
+          "changed": "字体已更换"
+        }
       }
     },
     "notes": {
