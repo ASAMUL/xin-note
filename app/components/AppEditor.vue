@@ -14,7 +14,7 @@ import { useEditorToolBar } from '~/composables/editor/useEditorToolBar';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
 import { common, createLowlight } from 'lowlight';
-import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
+import { LuminaCodeBlock } from '~/components/editor/EditorCodeBlockExtension';
 
 const lowlight = createLowlight(common);
 
@@ -98,7 +98,7 @@ const editorExtensions = [
     alignments: ['left', 'center', 'right', 'justify'],
     defaultAlignment: 'left',
   }),
-  CodeBlockLowlight.configure({
+  LuminaCodeBlock.configure({
     lowlight,
   }),
   TaskList,
