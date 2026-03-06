@@ -46,8 +46,6 @@ import {
   ChainOfThoughtContent,
   ChainOfThoughtHeader,
   ChainOfThoughtImage,
-  ChainOfThoughtSearchResult,
-  ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
 } from '~/components/ai-elements/chain-of-thought';
 import { Sources, SourcesContent, SourcesTrigger } from '~/components/ai-elements/sources';
@@ -675,13 +673,14 @@ const isMessageStreaming = (message: AiAssistantMessage) => {
   );
 };
 
-type ChainOfThoughtStepStatus = 'complete' | 'active' | 'pending';
+/**
+ * ===== 动态思维链 — Notion 风格数据模型 =====
+ */
 
-interface ChainOfThoughtProgressStepData {
-  key: 'retrieval' | 'reasoning' | 'response' | 'completed';
-  label: string;
-  description: string;
-  status: ChainOfThoughtStepStatus;
+interface ThinkingStep {
+  id: string;
+  content: string;
+  type: 'thinking' | 'search-result' | 'reasoning';
 }
 
 interface ChainOfThoughtImageData {
@@ -689,11 +688,11 @@ interface ChainOfThoughtImageData {
   caption: string;
 }
 
-interface ChainOfThoughtViewModel {
+interface ThinkingViewModel {
   shouldShow: boolean;
-  progressSteps: ChainOfThoughtProgressStepData[];
-  reasoningSteps: string[];
-  searchResults: string[];
+  isComplete: boolean;
+  steps: ThinkingStep[];
+  searchResultCount: number;
   images: ChainOfThoughtImageData[];
 }
 
@@ -722,14 +721,6 @@ const resolveImageSrc = (part: any) => {
   }
 
   return '';
-};
-
-const getSearchResultTags = (message: AiAssistantMessage): string[] => {
-  const fileNames = getMessageSources(message)
-    .map((source) => (source.fileName || '').trim())
-    .filter(Boolean);
-
-  return Array.from(new Set(fileNames));
 };
 
 const getAssistantImageParts = (message: AiAssistantMessage): ChainOfThoughtImageData[] => {
@@ -785,123 +776,101 @@ const getNearestUserImageParts = (
   return [];
 };
 
-const getProgressSteps = (
+/**
+ * 动态构建思维链步骤 -- 只在实际发生时添加对应步骤
+ */
+const buildDynamicThinking = (
   message: AiAssistantMessage,
-  reasoningSteps: string[],
-): ChainOfThoughtProgressStepData[] => {
+  currentMessages: AiAssistantMessage[],
+  messageIndex: number,
+): ThinkingViewModel => {
   const parts = getMessageParts(message);
-  const isStreaming = isMessageStreaming(message);
+  const streaming = isMessageStreaming(message);
   const sourceCount = getMessageSources(message).length;
-  const hasReasoning = reasoningSteps.length > 0;
+  const reasoningText = getReasoningText(message);
+  const reasoningParagraphs = toReasoningSteps(reasoningText);
   const hasText = getMessageText(message).trim().length > 0;
 
+  const steps: ThinkingStep[] = [];
+  let stepCounter = 0;
+
+  // 1. 有 reasoning 内容时，逐段添加思考步骤
+  for (const paragraph of reasoningParagraphs) {
+    stepCounter += 1;
+    steps.push({
+      id: `thinking-${message.id}-${stepCounter}`,
+      content: paragraph,
+      type: 'thinking',
+    });
+  }
+
+  // 2. 正在 streaming reasoning 但还没有内容时，显示占位
   const reasoningStreaming = parts.some(
     (part: any) => part?.type === 'reasoning' && part?.state === 'streaming',
   );
-  const textStreaming = parts.some(
-    (part: any) => part?.type === 'text' && part?.state === 'streaming',
-  );
+  if (reasoningStreaming && reasoningParagraphs.length === 0) {
+    steps.push({
+      id: `thinking-${message.id}-streaming`,
+      content: '正在思考…',
+      type: 'thinking',
+    });
+  }
 
-  const retrievalStatus: ChainOfThoughtStepStatus =
-    sourceCount > 0 || hasReasoning || hasText || !isStreaming ? 'complete' : 'active';
-  const reasoningStatus: ChainOfThoughtStepStatus = reasoningStreaming
-    ? 'active'
-    : hasReasoning || (!isStreaming && hasText)
-    ? 'complete'
-    : 'pending';
-  const responseStatus: ChainOfThoughtStepStatus = textStreaming
-    ? 'active'
-    : hasText
-    ? 'complete'
-    : 'pending';
-  const completedStatus: ChainOfThoughtStepStatus =
-    !isStreaming && hasText ? 'complete' : 'pending';
+  // 3. 有搜索结果时，添加搜索步骤
+  if (sourceCount > 0) {
+    steps.push({
+      id: `search-${message.id}`,
+      content: `已找到 ${sourceCount} 个结果`,
+      type: 'search-result',
+    });
+  }
 
-  return [
-    {
-      key: 'retrieval',
-      label: '检索上下文',
-      description: sourceCount > 0 ? `命中 ${sourceCount} 条结果` : '未命中检索片段',
-      status: retrievalStatus,
-    },
-    {
-      key: 'reasoning',
-      label: '推理分析',
-      description: hasReasoning ? `已产出 ${reasoningSteps.length} 个步骤` : '等待推理内容',
-      status: reasoningStatus,
-    },
-    {
-      key: 'response',
-      label: '生成回答',
-      description: textStreaming ? '正在生成回答内容' : hasText ? '回答内容已生成' : '等待回答内容',
-      status: responseStatus,
-    },
-    {
-      key: 'completed',
-      label: '完成',
-      description: completedStatus === 'complete' ? '当前轮次已完成' : '等待生成结束',
-      status: completedStatus,
-    },
-  ];
+  // 图片
+  const assistantImages = getAssistantImageParts(message);
+  const images =
+    assistantImages.length > 0
+      ? assistantImages
+      : getNearestUserImageParts(currentMessages, messageIndex);
+
+  const isComplete = !streaming && hasText;
+  const shouldShow = streaming || steps.length > 0 || images.length > 0;
+
+  return {
+    shouldShow,
+    isComplete,
+    steps,
+    searchResultCount: sourceCount,
+    images,
+  };
 };
 
-const chainOfThoughtByMessageId = computed<Record<string, ChainOfThoughtViewModel>>(() => {
+/**
+ * 按消息 ID 缓存的思维链视图模型
+ */
+const thinkingByMessageId = computed<Record<string, ThinkingViewModel>>(() => {
   const currentMessages = messages.value;
-  const result: Record<string, ChainOfThoughtViewModel> = {};
+  const result: Record<string, ThinkingViewModel> = {};
 
   currentMessages.forEach((message, messageIndex) => {
     if (message.role !== 'assistant') return;
-
-    const reasoningSteps = toReasoningSteps(getReasoningText(message));
-    const searchResults = getSearchResultTags(message);
-
-    const assistantImages = getAssistantImageParts(message);
-    const images =
-      assistantImages.length > 0
-        ? assistantImages
-        : getNearestUserImageParts(currentMessages, messageIndex);
-
-    const progressSteps = getProgressSteps(message, reasoningSteps);
-    const shouldShow =
-      isMessageStreaming(message) ||
-      reasoningSteps.length > 0 ||
-      searchResults.length > 0 ||
-      images.length > 0;
-
-    result[message.id] = {
-      shouldShow,
-      progressSteps,
-      reasoningSteps,
-      searchResults,
-      images,
-    };
+    result[message.id] = buildDynamicThinking(message, currentMessages, messageIndex);
   });
 
   return result;
 });
 
-const getChainOfThought = (message: AiAssistantMessage) => {
-  return chainOfThoughtByMessageId.value[message.id];
+const getThinking = (message: AiAssistantMessage): ThinkingViewModel => {
+  return thinkingByMessageId.value[message.id] || {
+    shouldShow: false,
+    isComplete: false,
+    steps: [],
+    searchResultCount: 0,
+    images: [],
+  };
 };
 
-const shouldShowChainOfThought = (message: AiAssistantMessage) => {
-  return Boolean(getChainOfThought(message)?.shouldShow);
-};
-
-const getChainProgressSteps = (message: AiAssistantMessage): ChainOfThoughtProgressStepData[] => {
-  return getChainOfThought(message)?.progressSteps || [];
-};
-
-const getChainSearchResults = (message: AiAssistantMessage): string[] => {
-  return getChainOfThought(message)?.searchResults || [];
-};
-
-const getChainReasoningSteps = (message: AiAssistantMessage): string[] => {
-  return getChainOfThought(message)?.reasoningSteps || [];
-};
-
-const getChainImages = (message: AiAssistantMessage): ChainOfThoughtImageData[] => {
-  return getChainOfThought(message)?.images || [];
+const shouldShowThinking = (message: AiAssistantMessage) => {
+  return getThinking(message).shouldShow;
 };
 const getSessionPreview = (session: AiAssistantSession) => {
   const firstUserMessage = session.messages.find((message) => message.role === 'user');
@@ -1065,78 +1034,29 @@ const handleDeleteSession = async (sessionId: string) => {
           <Message v-for="message in messages" :key="message.id" :from="message.role">
             <MessageContent class="max-w-full">
               <template v-if="message.role === 'assistant'">
+                <!-- 思维链 — Notion 风格 -->
                 <ChainOfThought
-                  v-if="shouldShowChainOfThought(message)"
-                  class="mb-2 rounded-md px-3 py-2"
+                  v-if="shouldShowThinking(message)"
+                  class="mb-2"
                   :default-open="true"
-                  style="background-color: var(--bg-popup); border: 1px solid var(--border-color)"
                 >
-                  <ChainOfThoughtHeader class="text-xs" style="color: var(--text-mute)">
-                    思考过程
+                  <ChainOfThoughtHeader :is-complete="getThinking(message).isComplete">
+                    {{ getThinking(message).isComplete ? '思考完毕' : '正在思考…' }}
                   </ChainOfThoughtHeader>
 
-                  <ChainOfThoughtContent class="space-y-3">
-                    <div class="space-y-2">
-                      <ChainOfThoughtStep
-                        v-for="progressStep in getChainProgressSteps(message)"
-                        :key="progressStep.key"
-                        :label="progressStep.label"
-                        :description="progressStep.description"
-                        :status="progressStep.status"
-                      >
-                        <template #icon>
-                          <UIcon
-                            :name="
-                              progressStep.status === 'complete'
-                                ? 'i-lucide-check'
-                                : progressStep.status === 'active'
-                                ? 'i-lucide-loader-2'
-                                : 'i-lucide-circle'
-                            "
-                            class="w-4 h-4"
-                            :class="progressStep.status === 'active' ? 'animate-spin' : ''"
-                          />
-                        </template>
-                      </ChainOfThoughtStep>
-                    </div>
+                  <ChainOfThoughtContent>
+                    <!-- 动态步骤 -->
+                    <ChainOfThoughtStep
+                      v-for="step in getThinking(message).steps"
+                      :key="step.id"
+                    >
+                      {{ step.content }}
+                    </ChainOfThoughtStep>
 
-                    <div v-if="getChainSearchResults(message).length > 0" class="space-y-1">
-                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">
-                        检索结果
-                      </div>
-                      <ChainOfThoughtSearchResults>
-                        <ChainOfThoughtSearchResult
-                          v-for="searchResult in getChainSearchResults(message)"
-                          :key="searchResult"
-                        >
-                          {{ searchResult }}
-                        </ChainOfThoughtSearchResult>
-                      </ChainOfThoughtSearchResults>
-                    </div>
-
-                    <div v-if="getChainReasoningSteps(message).length > 0" class="space-y-2">
-                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">
-                        逐步思考
-                      </div>
-                      <ChainOfThoughtStep
-                        v-for="(reasoningStep, stepIndex) in getChainReasoningSteps(message)"
-                        :key="`${message.id}-reasoning-${stepIndex}`"
-                        :label="`步骤 ${stepIndex + 1}`"
-                        :description="reasoningStep"
-                        status="complete"
-                      >
-                        <template #icon>
-                          <UIcon name="i-lucide-chevron-right" class="w-4 h-4" />
-                        </template>
-                      </ChainOfThoughtStep>
-                    </div>
-
-                    <div v-if="getChainImages(message).length > 0" class="space-y-2">
-                      <div class="text-[11px] font-medium" style="color: var(--text-mute)">
-                        图像
-                      </div>
+                    <!-- 图片 -->
+                    <div v-if="getThinking(message).images.length > 0" class="space-y-2 mt-2">
                       <ChainOfThoughtImage
-                        v-for="(image, imageIndex) in getChainImages(message)"
+                        v-for="(image, imageIndex) in getThinking(message).images"
                         :key="`${message.id}-image-${imageIndex}`"
                         :caption="image.caption"
                       >

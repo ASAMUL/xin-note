@@ -33,7 +33,7 @@ provide(ChainOfThoughtContextKey, isOpen as Ref<boolean>)
 
 <template>
   <div
-    :class="cn('not-prose max-w-prose space-y-4', props.class)"
+    :class="cn('space-y-1', props.class)"
     v-bind="$attrs"
   >
     <slot />

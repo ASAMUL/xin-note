@@ -1,54 +1,27 @@
 <script setup lang="ts">
+/**
+ * 思维链步骤组件 — Notion 风格
+ * 每个步骤以纯文本展示，使用淡入动画逐步出现
+ */
 import type { HTMLAttributes } from 'vue'
 import { cn } from '~/lib/utils'
 
-const props = withDefaults(
-  defineProps<{
-    label: string
-    description?: string
-    status?: 'complete' | 'active' | 'pending'
-    class?: HTMLAttributes['class']
-  }>(),
-  {
-    status: 'complete',
-    description: undefined,
-  },
-)
-
-const statusStyles = {
-  complete: 'text-muted-foreground',
-  active: 'text-foreground',
-  pending: 'text-muted-foreground/50',
-}
+const props = defineProps<{
+  class?: HTMLAttributes['class']
+}>()
 </script>
 
 <template>
   <div
     :class="
       cn(
-        'flex gap-2 text-sm',
-        statusStyles[props.status],
-        'fade-in-0 slide-in-from-top-2 animate-in',
+        'text-sm leading-relaxed animate-in fade-in-0 duration-300',
         props.class,
       )
     "
+    :style="{ color: 'var(--text-mute)' }"
     v-bind="$attrs"
   >
-    <div class="relative mt-0.5">
-      <slot name="icon" />
-      <div
-        class="-mx-px absolute top-7 bottom-0 left-1/2 w-px bg-border"
-      />
-    </div>
-    <div class="flex-1 space-y-2">
-      <div>{{ props.label }}</div>
-      <div
-        v-if="props.description"
-        class="text-muted-foreground text-xs"
-      >
-        {{ props.description }}
-      </div>
-      <slot />
-    </div>
+    <slot />
   </div>
 </template>

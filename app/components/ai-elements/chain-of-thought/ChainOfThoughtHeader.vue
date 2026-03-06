@@ -5,10 +5,11 @@ import {
   CollapsibleTrigger,
 } from '~/components/ui/collapsible'
 import { cn } from '~/lib/utils'
-import { BrainIcon, ChevronDownIcon } from 'lucide-vue-next'
+import { ChevronDownIcon } from 'lucide-vue-next'
 import { useChainOfThought } from './context'
 
 const props = defineProps<{
+  isComplete?: boolean
   class?: HtmlHTMLAttributes['class']
 }>()
 
@@ -20,23 +21,24 @@ const { isOpen, setIsOpen } = useChainOfThought()
     <CollapsibleTrigger
       :class="
         cn(
-          'flex w-full items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground',
+          'group flex w-full items-center gap-1 text-sm transition-colors cursor-pointer select-none',
           props.class,
         )
       "
+      :style="{ color: 'var(--text-mute)' }"
       v-bind="$attrs"
     >
-      <BrainIcon class="size-4" />
       <span class="flex-1 text-left">
-        <slot>Chain of Thought</slot>
+        <slot>{{ props.isComplete ? '思考完毕' : '正在思考…' }}</slot>
       </span>
       <ChevronDownIcon
         :class="
           cn(
-            'size-4 transition-transform',
+            'size-3.5 transition-transform duration-200',
             isOpen ? 'rotate-180' : 'rotate-0',
           )
         "
+        :style="{ color: 'var(--text-mute)' }"
       />
     </CollapsibleTrigger>
   </Collapsible>
