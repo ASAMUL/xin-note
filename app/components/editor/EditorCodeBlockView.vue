@@ -3,14 +3,14 @@
  * 自定义代码块 NodeView 组件（Notion 风格）
  * 工具栏默认隐藏，鼠标悬浮时浮现在代码块右上角
  */
-import { NodeViewWrapper, NodeViewContent } from '@tiptap/vue-3'
-import type { NodeViewProps } from '@tiptap/vue-3'
+import { NodeViewWrapper, NodeViewContent } from '@tiptap/vue-3';
+import type { NodeViewProps } from '@tiptap/vue-3';
 
-const props = defineProps<NodeViewProps>()
+const props = defineProps<NodeViewProps>();
 
 // 复制状态
-const copied = ref(false)
-let copyTimer: ReturnType<typeof setTimeout> | null = null
+const copied = ref(false);
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 // 常用编程语言列表（与 lowlight common 对齐）
 const languages = [
@@ -49,44 +49,43 @@ const languages = [
   { value: 'wasm', label: 'WebAssembly' },
   { value: 'xml', label: 'XML' },
   { value: 'yaml', label: 'YAML' },
-]
+];
 
 // 当前选中的语言（显示名称）
 const selectedLanguage = computed({
   get: () => props.node.attrs.language || '',
   set: (val: string) => {
-    props.updateAttributes({ language: val })
+    props.updateAttributes({ language: val });
   },
-})
+});
 
 // 获取语言显示名称
 const languageLabel = computed(() => {
-  const lang = languages.find(l => l.value === selectedLanguage.value)
-  return lang?.label || selectedLanguage.value || 'auto'
-})
+  const lang = languages.find((l) => l.value === selectedLanguage.value);
+  return lang?.label || selectedLanguage.value || 'auto';
+});
 
 /**
  * 复制代码块内容到剪贴板
  */
 async function copyCode() {
-  const text = props.node.textContent
+  const text = props.node.textContent;
   try {
-    await navigator.clipboard.writeText(text)
-    copied.value = true
+    await navigator.clipboard.writeText(text);
+    copied.value = true;
 
-    if (copyTimer) clearTimeout(copyTimer)
+    if (copyTimer) clearTimeout(copyTimer);
     copyTimer = setTimeout(() => {
-      copied.value = false
-    }, 2000)
-  }
-  catch (err) {
-    console.error('复制失败:', err)
+      copied.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error('复制失败:', err);
   }
 }
 
 onBeforeUnmount(() => {
-  if (copyTimer) clearTimeout(copyTimer)
-})
+  if (copyTimer) clearTimeout(copyTimer);
+});
 </script>
 
 <template>
@@ -94,15 +93,8 @@ onBeforeUnmount(() => {
     <!-- 浮动工具栏：默认隐藏，鼠标悬浮显示 -->
     <div class="cb-toolbar" contenteditable="false">
       <!-- 语言选择器 -->
-      <select
-        v-model="selectedLanguage"
-        class="cb-lang-select"
-      >
-        <option
-          v-for="lang in languages"
-          :key="lang.value"
-          :value="lang.value"
-        >
+      <select v-model="selectedLanguage" class="cb-lang-select">
+        <option v-for="lang in languages" :key="lang.value" :value="lang.value">
           {{ lang.label }}
         </option>
       </select>
@@ -151,9 +143,7 @@ onBeforeUnmount(() => {
   opacity: 0;
   pointer-events: none;
   transform: translateY(-2px);
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 /* 鼠标悬浮时显示 */

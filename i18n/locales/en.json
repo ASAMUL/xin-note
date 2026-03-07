@@ -199,6 +199,17 @@
       "searching": "Searching notes…",
       "noResults": "No note results to reference"
     },
+    "approval": {
+      "toastTitle": "Tool Requires Approval",
+      "toastDescription": "Tool \"{toolName}\" requested execution. Please approve.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "bannerText": "{count} tool(s) pending approval",
+      "bannerAction": "View",
+      "confirmTitle": "This tool will modify note content. Allow execution?",
+      "accepted": "Approved",
+      "rejected": "Rejected"
+    },
     "error": {
       "actions": {
         "viewDetail": "View Details"

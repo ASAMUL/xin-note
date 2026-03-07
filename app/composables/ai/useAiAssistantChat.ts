@@ -292,12 +292,12 @@ export function useAiAssistantChat() {
         index >= 0
           ? (parts[index] as AssistantToolPart)
           : {
-              type: 'dynamic-tool',
-              toolName: patch.toolName,
-              toolCallId: patch.toolCallId,
-              input: patch.input || {},
-              state: patch.state || 'input-available',
-            };
+            type: 'dynamic-tool',
+            toolName: patch.toolName,
+            toolCallId: patch.toolCallId,
+            input: patch.input || {},
+            state: patch.state || 'input-available',
+          };
 
       const next: AssistantToolPart = {
         ...prev,
@@ -879,20 +879,30 @@ export function useAiAssistantChat() {
     } as AiAssistantMessage;
   };
 
-  const composeSystemPrompt = (ragContext: string) => {
+  const composeSystemPrompt = (ragContext: string, referencedNoteIds: string[] = []) => {
     const basePrompt =
       '你是 Xin-Note 的写作与笔记助手。回答要简洁、结构清晰，并尽量给出可执行建议。' +
       '当用户在续写时，优先保持原文语气与风格。';
 
-    if (!ragContext) {
-      return basePrompt;
+    const parts: string[] = [basePrompt];
+
+    // 当用户通过 @ 引用了笔记时，提示 AI 使用 getNote 工具读取笔记内容
+    if (referencedNoteIds.length > 0) {
+      const noteList = referencedNoteIds.map(id => `- noteId: "${id}"`).join('\n');
+      parts.push(
+        '用户在本次消息中引用了以下笔记，请先使用 getNote 工具读取这些笔记的内容，然后再基于笔记内容回答用户的问题：\n' +
+        noteList,
+      );
     }
 
-    return (
-      `${basePrompt}\n\n` +
-      '以下是从用户笔记中检索到的参考片段。请优先基于这些内容回答，避免捏造。\n\n' +
-      ragContext
-    );
+    if (ragContext) {
+      parts.push(
+        '以下是从用户笔记中检索到的参考片段。请优先基于这些内容回答，避免捏造。\n\n' +
+        ragContext,
+      );
+    }
+
+    return parts.join('\n\n');
   };
 
   const sendMessage = async (payload: {
@@ -978,7 +988,7 @@ export function useAiAssistantChat() {
           model: modelId.value,
         },
         messages: historyForIpc,
-        system: composeSystemPrompt(ragResult.contextText),
+        system: composeSystemPrompt(ragResult.contextText, referenceDocIds),
       })) as { streamId?: string } | null;
 
       if (!result?.streamId) {

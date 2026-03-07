@@ -60,7 +60,6 @@ import {
 import {
   Confirmation,
   ConfirmationAccepted,
-  ConfirmationAction,
   ConfirmationActions,
   ConfirmationRejected,
   ConfirmationRequest,
@@ -105,6 +104,79 @@ const historyOpen = ref(false);
 const errorDetailOpen = ref(false);
 const activeErrorDetail = ref<AiAssistantErrorInfo | null>(null);
 const latestErrorLog = computed(() => errorLogs.value[0] || null);
+
+/**
+ * ===== 审批增强 — Toast 通知 + 悬浮提示条 =====
+ */
+const toast = useToast();
+
+/** 统计当前消息列表中处于 approval-requested 状态的工具数量 */
+const pendingApprovalCount = computed(() => {
+  let count = 0;
+  for (const message of messages.value) {
+    if (message.role !== 'assistant') continue;
+    const parts = Array.isArray(message.parts) ? message.parts : [];
+    for (const part of parts) {
+      if (isAssistantToolPart(part) && part.state === 'approval-requested') {
+        count += 1;
+      }
+    }
+  }
+  return count;
+});
+
+/** 已触发过 toast 的 approvalId 集合，避免重复弹出 */
+const notifiedApprovalIds = new Set<string>();
+
+/** 监听消息变化，检测新增的审批请求并弹出 Toast */
+watch(
+  messages,
+  (currentMessages) => {
+    for (const message of currentMessages) {
+      if (message.role !== 'assistant') continue;
+      const parts = Array.isArray(message.parts) ? message.parts : [];
+      for (const part of parts) {
+        if (
+          !isAssistantToolPart(part) ||
+          part.state !== 'approval-requested' ||
+          !part.approval?.id
+        ) continue;
+
+        const approvalId = part.approval.id;
+        if (notifiedApprovalIds.has(approvalId)) continue;
+
+        notifiedApprovalIds.add(approvalId);
+
+        // 捕获当前 toolPart 引用
+        const currentToolPart = part;
+
+        toast.add({
+          title: t('aiAssistant.approval.toastTitle'),
+          description: t('aiAssistant.approval.toastDescription', {
+            toolName: currentToolPart.toolName,
+          }),
+          color: 'neutral',
+          duration: 10000,
+          actions: [
+            {
+              label: t('aiAssistant.approval.approve'),
+              color: 'primary' as const,
+              variant: 'soft' as const,
+              onClick: () => handleToolApproval(currentToolPart, true),
+            },
+            {
+              label: t('aiAssistant.approval.reject'),
+              color: 'neutral' as const,
+              variant: 'ghost' as const,
+              onClick: () => handleToolApproval(currentToolPart, false),
+            },
+          ],
+        });
+      }
+    }
+  },
+  { deep: true },
+);
 
 const quickSuggestions = [
   '帮我把这段内容润色得更自然一些。',
@@ -1001,7 +1073,33 @@ const handleDeleteSession = async (sessionId: string) => {
       </UButton>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-hidden relative">
+      <!-- 悬浮审批提示横条 -->
+      <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        enter-from-class="opacity-0"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="pendingApprovalCount > 0"
+          class="absolute top-0 inset-x-0 z-40 mx-3 mt-2 flex items-center gap-2 rounded-md px-3 py-2"
+          style="
+            background-color: var(--bg-popup);
+            border: 1px solid var(--border-color);
+          "
+        >
+          <span
+            class="inline-flex h-2 w-2 shrink-0 rounded-full"
+            style="background-color: var(--color-warning)"
+          />
+          <span class="flex-1 text-xs" style="color: var(--text-main)">
+            {{ $t('aiAssistant.approval.bannerText', { count: pendingApprovalCount }) }}
+          </span>
+          <UIcon name="i-lucide-chevron-down" class="w-3.5 h-3.5" style="color: var(--text-mute)" />
+        </div>
+      </Transition>
+
       <Conversation class="h-full">
         <ConversationScrollButton />
 
@@ -1091,39 +1189,61 @@ const handleDeleteSession = async (sessionId: string) => {
                         v-if="toolPart.approval"
                         :approval="toolPart.approval"
                         :state="toolPart.state"
-                        class="mx-4 mb-4"
+                        class="mx-4 mb-4 rounded-md!"
+                        :style="
+                          isToolApprovalPending(toolPart)
+                            ? 'background-color: var(--bg-popup); border: 1px solid var(--border-color)'
+                            : ''
+                        "
                       >
-                        <ConfirmationTitle>该工具将修改笔记内容，是否允许执行？</ConfirmationTitle>
+                        <ConfirmationTitle
+                          class="flex items-center gap-1.5 text-[13px]!"
+                          :style="isToolApprovalPending(toolPart) ? 'color: var(--text-main)' : ''"
+                        >
+                          <span
+                            v-if="isToolApprovalPending(toolPart)"
+                            class="inline-flex h-2 w-2 shrink-0 rounded-full"
+                            style="background-color: var(--color-warning)"
+                          />
+                          {{ $t('aiAssistant.approval.confirmTitle') }}
+                        </ConfirmationTitle>
 
                         <ConfirmationRequest>
-                          <ConfirmationActions>
-                            <ConfirmationAction
+                          <ConfirmationActions class="gap-2!">
+                            <UButton
+                              size="xs"
+                              color="primary"
+                              variant="soft"
                               :disabled="!isToolApprovalPending(toolPart)"
                               @click="handleToolApproval(toolPart, true)"
                             >
-                              批准
-                            </ConfirmationAction>
-                            <ConfirmationAction
-                              variant="outline"
+                              {{ $t('aiAssistant.approval.approve') }}
+                            </UButton>
+                            <UButton
+                              size="xs"
+                              color="neutral"
+                              variant="ghost"
                               :disabled="!isToolApprovalPending(toolPart)"
                               @click="handleToolApproval(toolPart, false)"
                             >
-                              拒绝
-                            </ConfirmationAction>
+                              {{ $t('aiAssistant.approval.reject') }}
+                            </UButton>
                           </ConfirmationActions>
                         </ConfirmationRequest>
 
                         <ConfirmationAccepted>
-                          <div class="text-xs">
-                            审批通过{{
+                          <div class="text-xs flex items-center gap-1.5" style="color: var(--text-mute)">
+                            <UIcon name="i-lucide-check" class="w-3 h-3" style="color: var(--color-success)" />
+                            {{ $t('aiAssistant.approval.accepted') }}{{
                               toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : ''
                             }}
                           </div>
                         </ConfirmationAccepted>
 
                         <ConfirmationRejected>
-                          <div class="text-xs">
-                            审批拒绝{{
+                          <div class="text-xs flex items-center gap-1.5" style="color: var(--text-mute)">
+                            <UIcon name="i-lucide-x" class="w-3 h-3" style="color: var(--color-error)" />
+                            {{ $t('aiAssistant.approval.rejected') }}{{
                               toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : ''
                             }}
                           </div>

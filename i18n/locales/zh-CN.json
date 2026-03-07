@@ -199,6 +199,17 @@
       "searching": "正在搜索笔记…",
       "noResults": "没有可引用的笔记结果"
     },
+    "approval": {
+      "toastTitle": "工具需要审批",
+      "toastDescription": "工具「{toolName}」请求执行，请审批。",
+      "approve": "批准",
+      "reject": "拒绝",
+      "bannerText": "有 {count} 个工具等待审批",
+      "bannerAction": "查看",
+      "confirmTitle": "该工具将修改笔记内容，是否允许执行？",
+      "accepted": "审批通过",
+      "rejected": "审批拒绝"
+    },
     "error": {
       "actions": {
         "viewDetail": "查看详情"

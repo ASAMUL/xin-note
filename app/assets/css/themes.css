@@ -2,6 +2,7 @@
 
 :root[data-theme='paper'] {
   --bg-app: white;
+  --bg-code: rgba(66, 35, 3, 0.031);
   --color-soft: rgba(0, 0, 0, 0.04);
   --color-icon: #8e8b86;
   --bg-sidebar: #f9f8f7;
@@ -39,6 +40,7 @@
 
 .dark[data-theme='paper'] {
   --bg-app: #0f0f10;
+  --bg-code: rgba(66, 35, 3, 0.031);
   --color-soft: rgba(0, 0, 0, 0.04);
   --color-icon: #71717a;
   --bg-sidebar: #161618;
@@ -76,6 +78,7 @@
 
 :root[data-theme='ocean'] {
   --bg-app: #e9f3f8;
+  --bg-code: rgba(66, 35, 3, 0.031);
   --color-soft: rgba(0, 0, 0, 0.04);
   --color-icon: #8eb6d6;
   --bg-sidebar: #dcebf3;
@@ -113,6 +116,7 @@
 
 .dark[data-theme='ocean'] {
   --bg-app: #07131d;
+  --bg-code: rgba(66, 35, 3, 0.031);
   --color-soft: rgba(0, 0, 0, 0.04);
   --color-icon: #8eb6d6;
   --bg-sidebar: #0d1d2a;
@@ -150,6 +154,7 @@
 
 :root[data-theme='forest'] {
   --bg-app: #eef3ea;
+  --bg-code: rgba(66, 35, 3, 0.031);
   --color-soft: rgba(0, 0, 0, 0.04);
   --color-icon: #9ab8a1;
   --bg-sidebar: #e3ebde;
@@ -187,6 +192,7 @@
 
 .dark[data-theme='forest'] {
   --bg-app: #0d1812;
+  --bg-code: rgba(66, 35, 3, 0.031);
   --color-soft: rgba(0, 0, 0, 0.04);
   --bg-sidebar: #132219;
   --bg-paper: #162b1f;
