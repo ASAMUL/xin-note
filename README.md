@@ -2,7 +2,7 @@
 
 # ✨ Xin Note
 
-**AI 驱动的智能笔记 & 小说创作工具**
+**AI 驱动的智能笔记**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Nuxt](https://img.shields.io/badge/Nuxt-4-00DC82?logo=nuxt.js&logoColor=white)](https://nuxt.com)
@@ -17,7 +17,7 @@
 
 ## 📖 简介
 
-**Xin Note** 是一款 AI 辅助的桌面笔记与小说创作工具。有些人用它记笔记，有些人用它写小说，还有些人打开之后盯着空白页面发了一下午呆——不过没关系，AI 会替你先写两句。
+**Xin Note** 是一款 AI 辅助的桌面笔记工具。有些人用它记笔记，有些人打开之后盯着空白页面发了一下午呆——不过没关系，AI 会替你先写两句。
 
 基于 Electron 构建，支持 Windows 和 macOS。是的，它是一个桌面应用，因为有些灵感值得被 native 地对待。
 

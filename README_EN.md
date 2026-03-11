@@ -2,7 +2,7 @@
 
 # ✨ Xin Note
 
-**AI-Powered Intelligent Note-Taking & Novel Writing Tool**
+**AI-Powered Intelligent Note-Taking**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Nuxt](https://img.shields.io/badge/Nuxt-4-00DC82?logo=nuxt.js&logoColor=white)](https://nuxt.com)
@@ -17,7 +17,7 @@ English | [简体中文](./README.md)
 
 ## 📖 Introduction
 
-**Xin Note** is an AI-powered desktop note-taking and novel-writing tool. Some people use it to take notes, some use it to write novels, and some just stare at a blank page all afternoon — but that's fine, the AI will write the first few lines for you.
+**Xin Note** is an AI-powered desktop note-taking tool. Some people use it to take notes, some just stare at a blank page all afternoon — but that's fine, the AI will write the first few lines for you.
 
 Built on Electron for Windows and macOS. Yes, it's a desktop app, because some inspirations deserve to be treated natively.
 

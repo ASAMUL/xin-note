@@ -136,11 +136,8 @@ watch(
       if (message.role !== 'assistant') continue;
       const parts = Array.isArray(message.parts) ? message.parts : [];
       for (const part of parts) {
-        if (
-          !isAssistantToolPart(part) ||
-          part.state !== 'approval-requested' ||
-          !part.approval?.id
-        ) continue;
+        if (!isAssistantToolPart(part) || part.state !== 'approval-requested' || !part.approval?.id)
+          continue;
 
         const approvalId = part.approval.id;
         if (notifiedApprovalIds.has(approvalId)) continue;
@@ -932,13 +929,15 @@ const thinkingByMessageId = computed<Record<string, ThinkingViewModel>>(() => {
 });
 
 const getThinking = (message: AiAssistantMessage): ThinkingViewModel => {
-  return thinkingByMessageId.value[message.id] || {
-    shouldShow: false,
-    isComplete: false,
-    steps: [],
-    searchResultCount: 0,
-    images: [],
-  };
+  return (
+    thinkingByMessageId.value[message.id] || {
+      shouldShow: false,
+      isComplete: false,
+      steps: [],
+      searchResultCount: 0,
+      images: [],
+    }
+  );
 };
 
 const shouldShowThinking = (message: AiAssistantMessage) => {
@@ -1084,10 +1083,7 @@ const handleDeleteSession = async (sessionId: string) => {
         <div
           v-if="pendingApprovalCount > 0"
           class="absolute top-0 inset-x-0 z-40 mx-3 mt-2 flex items-center gap-2 rounded-md px-3 py-2"
-          style="
-            background-color: var(--bg-popup);
-            border: 1px solid var(--border-color);
-          "
+          style="background-color: var(--bg-popup); border: 1px solid var(--border-color)"
         >
           <span
             class="inline-flex h-2 w-2 shrink-0 rounded-full"
@@ -1145,10 +1141,7 @@ const handleDeleteSession = async (sessionId: string) => {
 
                   <ChainOfThoughtContent>
                     <!-- 动态步骤 -->
-                    <ChainOfThoughtStep
-                      v-for="step in getThinking(message).steps"
-                      :key="step.id"
-                    >
+                    <ChainOfThoughtStep v-for="step in getThinking(message).steps" :key="step.id">
                       {{ step.content }}
                     </ChainOfThoughtStep>
 
@@ -1232,18 +1225,34 @@ const handleDeleteSession = async (sessionId: string) => {
                         </ConfirmationRequest>
 
                         <ConfirmationAccepted>
-                          <div class="text-xs flex items-center gap-1.5" style="color: var(--text-mute)">
-                            <UIcon name="i-lucide-check" class="w-3 h-3" style="color: var(--color-success)" />
-                            {{ $t('aiAssistant.approval.accepted') }}{{
+                          <div
+                            class="text-xs flex items-center gap-1.5"
+                            style="color: var(--text-mute)"
+                          >
+                            <UIcon
+                              name="i-lucide-check"
+                              class="w-3 h-3"
+                              style="color: var(--color-success)"
+                            />
+                            {{ $t('aiAssistant.approval.accepted')
+                            }}{{
                               toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : ''
                             }}
                           </div>
                         </ConfirmationAccepted>
 
                         <ConfirmationRejected>
-                          <div class="text-xs flex items-center gap-1.5" style="color: var(--text-mute)">
-                            <UIcon name="i-lucide-x" class="w-3 h-3" style="color: var(--color-error)" />
-                            {{ $t('aiAssistant.approval.rejected') }}{{
+                          <div
+                            class="text-xs flex items-center gap-1.5"
+                            style="color: var(--text-mute)"
+                          >
+                            <UIcon
+                              name="i-lucide-x"
+                              class="w-3 h-3"
+                              style="color: var(--color-error)"
+                            />
+                            {{ $t('aiAssistant.approval.rejected')
+                            }}{{
                               toolPart.approval?.reason ? `：${toolPart.approval?.reason}` : ''
                             }}
                           </div>

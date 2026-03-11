@@ -376,7 +376,7 @@ const navItems = computed(() => {
       <!-- Logo -->
       <div class="logo-section">
         <div class="logo">
-          <UIcon name="i-lucide-feather" class="w-5 h-5" />
+          <img src="/application/icons/xin-note-icon.png" alt="logo" class="w-5 h-5" />
         </div>
         <span class="logo-text">{{ $t('app.name') }}</span>
       </div>

@@ -6,7 +6,7 @@ alwaysApply: true
 
 # 如果有任何不懂的，不理解的，一定要先反问我，然后再开始编码。
 
-# profile：目前正在开发一款 ai 辅助写笔记 or 小说的产品，名字叫 xin-note，主要想法目前是智能提示(类似 cursor 的 tab 功能)，可以按 tab 键出现灵感，比如出现 3 个候选灵感，让使用者选择。可以做一个全局检索让 ai 读懂整个笔记 or 小说，具有 agent 能力。
+# profile：目前正在开发一款 ai 辅助写笔记 or 小说的产品，名字叫 xin-note，主要想法目前是智能提示(类似 cursor 的 tab 功能)，可以按 tab 键出现灵感。可以做一个全局检索让 ai 读懂整个笔记 or 小说，具有 agent 能力。
 
 # 所用技术栈：nuxt.js 4，nuxt-ui 4，tailwindCss4，tiptap，electron。
 
